@@ -1,0 +1,462 @@
+// GrowProfile — Full Prisma Schema
+// PostgreSQL database for the Instagram AutoDM SaaS platform
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum PlanType {
+  STARTER
+  CREATOR
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  TRIALING
+  EXPIRED
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum CampaignType {
+  COMMENT_DM
+  STORY_REPLY
+  LIVE_DM
+  DM_KEYWORD
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum InteractionType {
+  COMMENT
+  DM_RECEIVED
+  DM_SENT
+  FOLLOW_CHECK
+}
+
+enum InteractionStatus {
+  PENDING
+  REPLIED
+  FOLLOW_PENDING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum AbuseFlagType {
+  SPAM
+  RATE_LIMIT_EXCEEDED
+  TOS_VIOLATION
+  REPORTED_BY_USER
+  SUSPICIOUS_ACTIVITY
+  TOKEN_FAILURE
+}
+
+enum AbuseFlagSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AbuseFlagStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  DISMISSED
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+// ─────────────────────────────────────────────
+// MODELS
+// ─────────────────────────────────────────────
+
+model User {
+  id          String     @id @default(uuid())
+  firebaseUid String     @unique @map("firebase_uid")
+  email       String     @unique
+  name        String?
+  avatarUrl   String?    @map("avatar_url")
+  role        UserRole   @default(USER)
+  status      UserStatus @default(ACTIVE)
+
+  // Plan & subscription
+  planId String? @map("plan_id")
+  plan   Plan?   @relation(fields: [planId], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  subscriptions     Subscription[]
+  payments          Payment[]
+  instagramAccounts InstagramAccount[]
+  campaigns         Campaign[]
+  leads             Lead[]
+  auditLogs         AuditLog[]         @relation("UserAuditLogs")
+  abuseFlags        AbuseFlag[]        @relation("UserAbuseFlags")
+  resolvedFlags     AbuseFlag[]        @relation("ResolvedByUser")
+  systemSettings    SystemSetting[]    @relation("SettingUpdatedBy")
+  referralsSent     Referral[]         @relation("Referrer")
+  referralsReceived Referral[]         @relation("Referred")
+
+  @@map("users")
+}
+
+model Plan {
+  id              String   @id @default(uuid())
+  name            PlanType @unique
+  displayName     String   @map("display_name")
+  price           Decimal  @db.Decimal(10, 2) // Monthly price in USD
+  firstMonthPrice Decimal? @map("first_month_price") @db.Decimal(10, 2) // Promo price
+  maxIgAccounts   Int      @default(1) @map("max_ig_accounts")
+  maxLeads        Int      @default(10) @map("max_leads") // -1 = unlimited
+  features        Json     @default("{}") // JSON blob of feature flags
+  isActive        Boolean  @default(true) @map("is_active")
+
+  // AutoDM scope
+  allowReels    Boolean @default(true) @map("allow_reels")
+  allowPosts    Boolean @default(true) @map("allow_posts")
+  allowStories  Boolean @default(false) @map("allow_stories")
+  allowDms      Boolean @default(false) @map("allow_dms")
+  allowLives    Boolean @default(false) @map("allow_lives")
+  advancedFlows Boolean @default(false) @map("advanced_flows") // follow-gate, follow-ups, email collection
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users         User[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id     String             @id @default(uuid())
+  userId String             @map("user_id")
+  user   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId String             @map("plan_id")
+  plan   Plan               @relation(fields: [planId], references: [id])
+  status SubscriptionStatus @default(ACTIVE)
+
+  // Razorpay
+  razorpaySubscriptionId String? @unique @map("razorpay_subscription_id")
+  razorpayCustomerId     String? @map("razorpay_customer_id")
+
+  // Billing period
+  currentPeriodStart DateTime? @map("current_period_start")
+  currentPeriodEnd   DateTime? @map("current_period_end")
+  cancelledAt        DateTime? @map("cancelled_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  payments Payment[]
+
+  @@index([userId])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  userId         String        @map("user_id")
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId String?       @map("subscription_id")
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  // Razorpay
+  razorpayPaymentId String? @unique @map("razorpay_payment_id")
+  razorpayOrderId   String? @map("razorpay_order_id")
+
+  amount   Decimal       @db.Decimal(10, 2)
+  currency String        @default("USD")
+  status   PaymentStatus @default(CREATED)
+  method   String? // card, upi, netbanking, etc.
+
+  paidAt DateTime? @map("paid_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("payments")
+}
+
+model InstagramAccount {
+  id         String  @id @default(uuid())
+  userId     String  @map("user_id")
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  igUserId   String  @unique @map("ig_user_id") // Instagram user ID
+  igUsername String  @map("ig_username")
+  isActive   Boolean @default(true) @map("is_active")
+
+  // Encrypted token storage
+  accessTokenEncrypted String?   @map("access_token_encrypted") // AES-256-GCM encrypted
+  accessTokenIv        String?   @map("access_token_iv")
+  accessTokenTag       String?   @map("access_token_tag")
+  tokenExpiresAt       DateTime? @map("token_expires_at")
+
+  // Webhook subscription status
+  subscribedWebhooks Boolean @default(false) @map("subscribed_webhooks")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  campaigns     Campaign[]
+  interactions  Interaction[]
+  webhookEvents WebhookEvent[]
+  abuseFlags    AbuseFlag[]
+  campaignMedia CampaignMedia[]
+
+  @@index([userId])
+  @@map("instagram_accounts")
+}
+
+model Campaign {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  igAccountId String         @map("ig_account_id")
+  igAccount   InstagramAccount @relation(fields: [igAccountId], references: [id], onDelete: Cascade)
+
+  name    String
+  type    CampaignType   @default(COMMENT_DM)
+  status  CampaignStatus @default(DRAFT)
+
+  // Trigger config
+  triggerKeywords String[] @map("trigger_keywords") // Array of keywords to match
+
+  // Response config
+  replyMessage        String?  @map("reply_message") // Public comment reply text
+  dmMessages          Json     @default("[]") @map("dm_messages") // JSON array of DM message sequence
+  requireFollow       Boolean  @default(false) @map("require_follow") // Follow-gate
+  followUpEnabled     Boolean  @default(false) @map("follow_up_enabled")
+  followUpDelayMinutes Int     @default(60) @map("follow_up_delay_minutes")
+  maxFollowUps        Int      @default(2) @map("max_follow_ups")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  media        CampaignMedia[]
+  interactions Interaction[]
+  leads        Lead[]
+
+  @@index([userId])
+  @@index([igAccountId])
+  @@map("campaigns")
+}
+
+model CampaignMedia {
+  id          String           @id @default(uuid())
+  campaignId  String           @map("campaign_id")
+  campaign    Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  igAccountId String           @map("ig_account_id")
+  igAccount   InstagramAccount @relation(fields: [igAccountId], references: [id], onDelete: Cascade)
+
+  igMediaId String  @map("ig_media_id") // Instagram media ID
+  mediaUrl  String? @map("media_url")
+  mediaType String? @map("media_type") // IMAGE, VIDEO, CAROUSEL_ALBUM
+  caption   String?
+  permalink String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([campaignId, igMediaId])
+  @@map("campaign_media")
+}
+
+model Interaction {
+  id          String           @id @default(uuid())
+  campaignId  String?          @map("campaign_id")
+  campaign    Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  igAccountId String           @map("ig_account_id")
+  igAccount   InstagramAccount @relation(fields: [igAccountId], references: [id], onDelete: Cascade)
+
+  // The Instagram user who interacted
+  igScopedUserId String  @map("ig_scoped_user_id")
+  igUsername     String? @map("ig_username")
+
+  type   InteractionType
+  status InteractionStatus @default(PENDING)
+
+  // Comment data
+  commentId   String? @map("comment_id")
+  commentText String? @map("comment_text")
+
+  // DM data
+  dmMessageId String? @map("dm_message_id")
+
+  // Follow check
+  isFollowing Boolean? @map("is_following")
+
+  // Flexible metadata
+  metadata     Json?    @default("{}")
+  followUpCount Int     @default(0) @map("follow_up_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([campaignId])
+  @@index([igAccountId])
+  @@index([igScopedUserId])
+  @@map("interactions")
+}
+
+model Lead {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId  String?   @map("campaign_id")
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  igScopedUserId String  @map("ig_scoped_user_id")
+  igUsername     String? @map("ig_username")
+  email          String?
+  followsAccount Boolean @default(false) @map("follows_account")
+
+  capturedAt DateTime @default(now()) @map("captured_at")
+
+  @@index([userId])
+  @@index([campaignId])
+  @@map("leads")
+}
+
+model AuditLog {
+  id         String  @id @default(uuid())
+  userId     String? @map("user_id")
+  user       User?   @relation("UserAuditLogs", fields: [userId], references: [id], onDelete: SetNull)
+
+  action     String   // e.g. "user.signup", "campaign.create", "admin.suspend_user"
+  entityType String?  @map("entity_type") // e.g. "User", "Campaign", "Subscription"
+  entityId   String?  @map("entity_id")
+  details    Json?    @default("{}")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model AbuseFlag {
+  id          String           @id @default(uuid())
+  userId      String           @map("user_id")
+  user        User             @relation("UserAbuseFlags", fields: [userId], references: [id], onDelete: Cascade)
+  igAccountId String?          @map("ig_account_id")
+  igAccount   InstagramAccount? @relation(fields: [igAccountId], references: [id], onDelete: SetNull)
+
+  type        AbuseFlagType
+  severity    AbuseFlagSeverity @default(LOW)
+  description String?
+  metadata    Json?             @default("{}")
+  status      AbuseFlagStatus   @default(OPEN)
+
+  resolvedById String?   @map("resolved_by_id")
+  resolvedBy   User?     @relation("ResolvedByUser", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime? @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([severity])
+  @@map("abuse_flags")
+}
+
+model WebhookEvent {
+  id          String           @id @default(uuid())
+  igAccountId String?          @map("ig_account_id")
+  igAccount   InstagramAccount? @relation(fields: [igAccountId], references: [id], onDelete: SetNull)
+
+  eventType   String           @map("event_type") // "comments", "messages"
+  payload     Json
+  status      WebhookEventStatus @default(RECEIVED)
+  error       String?
+  processedAt DateTime?        @map("processed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([igAccountId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("webhook_events")
+}
+
+model SystemSetting {
+  id        String @id @default(uuid())
+  key       String @unique
+  value     Json
+  updatedBy String? @map("updated_by")
+  updater   User?   @relation("SettingUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+model Referral {
+  id         String @id @default(uuid())
+  referrerId String @map("referrer_id")
+  referrer   User   @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredId String @map("referred_id")
+  referred   User   @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+
+  referralCode String  @map("referral_code")
+  status       String  @default("pending") // pending, completed, rewarded
+  rewardApplied Boolean @default(false) @map("reward_applied")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([referrerId, referredId])
+  @@index([referralCode])
+  @@map("referrals")
+}
