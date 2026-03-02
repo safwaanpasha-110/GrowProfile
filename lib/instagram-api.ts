@@ -3,8 +3,8 @@
  * Handles DM sending, follower checking, comment replies, and webhook subscriptions.
  */
 
-const IG_API_VERSION = 'v21.0'
-const IG_API_BASE = `https://graph.instagram.com/${IG_API_VERSION}`
+const IG_API_VERSION = 'v25.0'
+const IG_API_BASE = `https://graph.facebook.com/${IG_API_VERSION}`
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -43,8 +43,12 @@ export async function sendInstagramDM(
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({
+      messaging_product: 'instagram',
       recipient: { id: recipientId },
       message: { text: messageText },
     }),
@@ -78,7 +82,10 @@ export async function replyToComment(
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({ message }),
   })
 
@@ -107,8 +114,12 @@ export async function sendPrivateReply(
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({
+      messaging_product: 'instagram',
       recipient: { comment_id: commentId },
       message: { text: messageText },
     }),
@@ -187,6 +198,51 @@ export async function fetchCommentDetails(
   return res.json()
 }
 
+// ─── Fetch comments on a media post ────────────────────────
+
+export interface IgComment {
+  id: string
+  text: string
+  from: { id: string; username: string }
+  timestamp: string
+}
+
+/**
+ * Fetch all comments on a media post.
+ * Uses: GET /{media-id}/comments
+ * Handles pagination automatically.
+ *
+ * @param mediaId - The IG media ID
+ * @param accessToken - Page/IG access token
+ * @param limit - Max comments to fetch (default 100)
+ */
+export async function fetchMediaComments(
+  mediaId: string,
+  accessToken: string,
+  limit: number = 100
+): Promise<IgComment[]> {
+  const allComments: IgComment[] = []
+  let url: string | null = `${IG_API_BASE}/${mediaId}/comments?fields=id,text,from,timestamp&limit=50&access_token=${accessToken}`
+
+  while (url && allComments.length < limit) {
+    const res = await fetch(url)
+    if (!res.ok) {
+      const err = await res.text()
+      throw new Error(`IG comments fetch failed (${res.status}): ${err}`)
+    }
+
+    const data = await res.json()
+    if (data.data) {
+      allComments.push(...data.data)
+    }
+
+    // Follow pagination cursor
+    url = data.paging?.next || null
+  }
+
+  return allComments.slice(0, limit)
+}
+
 // ─── Subscribe to webhooks ─────────────────────────────────
 
 /**
@@ -245,6 +301,75 @@ export async function unsubscribeFromWebhooks(
   }
 
   return true
+}
+
+// ─── Token Debug & Page Token Helpers ────────────────────────
+
+export interface TokenDebugData {
+  app_id: string
+  type: string
+  application: string
+  /** Unix timestamp. 0 means "never expires". */
+  expires_at: number
+  /** Unix timestamp for data access expiry. */
+  data_access_expires_at: number
+  is_valid: boolean
+  scopes: string[]
+  user_id?: string
+}
+
+/**
+ * Inspect a token using the Graph API's /debug_token endpoint.
+ * Returns validity, expiry timestamp (0 = never), scopes, etc.
+ *
+ * @param inputToken  - The token to inspect
+ * @param appId       - Facebook App ID
+ * @param appSecret   - Facebook App Secret
+ */
+export async function debugToken(
+  inputToken: string,
+  appId: string,
+  appSecret: string
+): Promise<TokenDebugData> {
+  const appToken = `${appId}|${appSecret}`
+  const url = `${IG_API_BASE}/debug_token?input_token=${encodeURIComponent(inputToken)}&access_token=${encodeURIComponent(appToken)}`
+
+  const res = await fetch(url)
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`debug_token failed (${res.status}): ${err}`)
+  }
+
+  const json = await res.json()
+  if (json.error) throw new Error(`debug_token error: ${JSON.stringify(json.error)}`)
+  return json.data as TokenDebugData
+}
+
+export interface FacebookPage {
+  id: string
+  name: string
+  access_token: string
+}
+
+/**
+ * Fetch the Facebook Pages the given user manages, including their Page Access Tokens.
+ * Requires a long-lived User token or IG User token.
+ * The returned Page tokens are non-expiring when derived from a long-lived user token.
+ *
+ * @param userToken - Long-lived IG or Facebook User access token
+ */
+export async function fetchPagesForUser(userToken: string): Promise<FacebookPage[]> {
+  const url = `${IG_API_BASE}/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(userToken)}`
+
+  const res = await fetch(url)
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`fetch /me/accounts failed (${res.status}): ${err}`)
+  }
+
+  const json = await res.json()
+  if (json.error) throw new Error(`/me/accounts error: ${JSON.stringify(json.error)}`)
+  return (json.data || []) as FacebookPage[]
 }
 
 // ─── Rate limiting helper ──────────────────────────────────

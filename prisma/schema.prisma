@@ -232,7 +232,15 @@ model InstagramAccount {
   igUsername String  @map("ig_username")
   isActive   Boolean @default(true) @map("is_active")
 
-  // Encrypted token storage
+  // Facebook Page binding (needed for comments/messaging APIs)
+  pageId                    String?   @map("page_id")
+  pageName                  String?   @map("page_name")
+  pageAccessTokenEncrypted  String?   @map("page_access_token_encrypted")
+  pageAccessTokenIv         String?   @map("page_access_token_iv")
+  pageAccessTokenTag        String?   @map("page_access_token_tag")
+  igBusinessId              String?   @map("ig_business_id") // IG Business Account ID from Page
+
+  // Encrypted IG user token storage (kept for profile/basic calls)
   accessTokenEncrypted String?   @map("access_token_encrypted") // AES-256-GCM encrypted
   accessTokenIv        String?   @map("access_token_iv")
   accessTokenTag       String?   @map("access_token_tag")

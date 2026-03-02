@@ -57,12 +57,28 @@ export const GET = withAuth(async (request: NextRequest, user: AuthUser) => {
       'comments_count',
     ].join(',')
 
+    // Use PAGE_ACCESS_TOKEN + igBusinessId if available, else fall back to IG token
+    let apiToken = accessToken
+    let apiIgId = account.igUserId
+
+    if (account.pageAccessTokenEncrypted && account.igBusinessId) {
+      const pageToken = decryptToken({
+        accessTokenEncrypted: account.pageAccessTokenEncrypted,
+        accessTokenIv: account.pageAccessTokenIv,
+        accessTokenTag: account.pageAccessTokenTag,
+      })
+      if (pageToken) {
+        apiToken = pageToken
+        apiIgId = account.igBusinessId
+      }
+    }
+
     const url = new URL(
-      `https://graph.instagram.com/v21.0/${account.igUserId}/media`
+      `https://graph.facebook.com/v25.0/${apiIgId}/media`
     )
     url.searchParams.set('fields', fields)
     url.searchParams.set('limit', String(limit))
-    url.searchParams.set('access_token', accessToken)
+    url.searchParams.set('access_token', apiToken)
     if (after) url.searchParams.set('after', after)
 
     const res = await fetch(url.toString())

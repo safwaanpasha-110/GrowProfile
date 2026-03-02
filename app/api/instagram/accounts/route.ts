@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth, AuthenticatedHandler } from '@/lib/api-middleware'
 import prisma from '@/lib/prisma'
 import { decryptToken, encryptToken } from '@/lib/encryption'
+import { fetchPagesForUser } from '@/lib/instagram-api'
 import { AuthUser } from '@/lib/auth'
 
 /**
@@ -149,7 +150,8 @@ export const POST = withAuth(async (request: NextRequest, user: AuthUser) => {
   }
 
   try {
-    // Refresh long-lived token via Instagram API
+    // Refresh long-lived IG token via Instagram API
+    // Note: Page Access Tokens (stored separately) do NOT expire.
     const url = new URL('https://graph.instagram.com/refresh_access_token')
     url.searchParams.set('grant_type', 'ig_refresh_token')
     url.searchParams.set('access_token', currentToken)
@@ -193,9 +195,36 @@ export const POST = withAuth(async (request: NextRequest, user: AuthUser) => {
       },
     })
 
+    // ── Re-derive Page Access Token from the freshly refreshed IG user token ─
+    // Page tokens derived from long-lived user tokens never expire, but we
+    // always keep them in sync so revocations are caught on the next refresh.
+    let pageTokenRefreshed = false
+    if (account.pageId) {
+      try {
+        const pages = await fetchPagesForUser(newToken)
+        const matchedPage = pages.find((p) => p.id === account.pageId)
+        if (matchedPage) {
+          const encryptedPage = encryptToken(matchedPage.access_token)
+          await prisma.instagramAccount.update({
+            where: { id: accountId },
+            data: {
+              pageAccessTokenEncrypted: encryptedPage.accessTokenEncrypted,
+              pageAccessTokenIv: encryptedPage.accessTokenIv,
+              pageAccessTokenTag: encryptedPage.accessTokenTag,
+            },
+          })
+          pageTokenRefreshed = true
+        }
+      } catch (pageErr) {
+        // Non-fatal — log but don't block the IG token refresh response
+        console.error('[accounts] Failed to re-derive page token:', pageErr)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       tokenExpiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+      pageTokenRefreshed,
     })
   } catch (err: any) {
     console.error('Token refresh error:', err)

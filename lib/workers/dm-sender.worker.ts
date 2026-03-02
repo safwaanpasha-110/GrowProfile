@@ -109,6 +109,8 @@ async function incrementRateLimit(igAccountId: string) {
 }
 
 // ─── Get decrypted access token ───────────────────────────
+// Prefers PAGE_ACCESS_TOKEN (required for messaging/comments APIs).
+// Falls back to IG user token if page token is not available.
 
 async function getAccessToken(igAccountId: string): Promise<string> {
   const account = await prisma.instagramAccount.findUnique({
@@ -117,20 +119,35 @@ async function getAccessToken(igAccountId: string): Promise<string> {
       accessTokenEncrypted: true,
       accessTokenIv: true,
       accessTokenTag: true,
+      pageAccessTokenEncrypted: true,
+      pageAccessTokenIv: true,
+      pageAccessTokenTag: true,
       tokenExpiresAt: true,
       isActive: true,
       igUserId: true,
+      igBusinessId: true,
     },
   })
 
   if (!account) throw new Error(`IG account ${igAccountId} not found`)
   if (!account.isActive) throw new Error(`IG account ${igAccountId} is inactive`)
 
-  // Check token expiry
+  // Check IG token expiry
   if (account.tokenExpiresAt && new Date(account.tokenExpiresAt) < new Date()) {
     throw new Error(`IG account ${igAccountId} token has expired`)
   }
 
+  // Prefer PAGE_ACCESS_TOKEN (required for messaging/comments)
+  if (account.pageAccessTokenEncrypted) {
+    const pageToken = decryptToken({
+      accessTokenEncrypted: account.pageAccessTokenEncrypted,
+      accessTokenIv: account.pageAccessTokenIv,
+      accessTokenTag: account.pageAccessTokenTag,
+    })
+    if (pageToken) return pageToken
+  }
+
+  // Fall back to IG user token
   const token = decryptToken({
     accessTokenEncrypted: account.accessTokenEncrypted,
     accessTokenIv: account.accessTokenIv,
@@ -222,13 +239,16 @@ const worker = new Worker<DmJobData>(
       // Get access token (only needed in production)
       const accessToken = await getAccessToken(igAccountId)
 
-      // Get IG user ID for API calls
+      // Get IG user ID for API calls — prefer igBusinessId for messaging
       const igAccount = await prisma.instagramAccount.findUnique({
         where: { id: igAccountId },
-        select: { igUserId: true },
+        select: { igUserId: true, igBusinessId: true },
       })
 
       if (!igAccount) throw new Error('IG account not found')
+
+      // Use igBusinessId (from Page) for messaging API calls if available
+      const apiIgId = igAccount.igBusinessId || igAccount.igUserId
 
       // First message: Send public comment reply if configured
       if (messageIndex === 0 && replyMessage && commentId) {
@@ -246,7 +266,7 @@ const worker = new Worker<DmJobData>(
         if (messageIndex === 0 && commentId) {
           try {
             const result = await sendPrivateReply(
-              igAccount.igUserId,
+              apiIgId,
               commentId,
               messageText,
               accessToken
@@ -263,7 +283,7 @@ const worker = new Worker<DmJobData>(
           } catch (privateReplyErr) {
             console.warn(`[DmSender] Private reply failed, falling back to direct DM:`, privateReplyErr)
             const result = await sendInstagramDM(
-              igAccount.igUserId,
+              apiIgId,
               recipientId,
               messageText,
               accessToken
@@ -280,7 +300,7 @@ const worker = new Worker<DmJobData>(
           }
         } else {
           const result = await sendInstagramDM(
-            igAccount.igUserId,
+            apiIgId,
             recipientId,
             messageText,
             accessToken

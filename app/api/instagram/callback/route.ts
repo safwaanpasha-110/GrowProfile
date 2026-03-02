@@ -3,9 +3,10 @@ import prisma from '@/lib/prisma'
 import { encryptToken } from '@/lib/encryption'
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
+const GRAPH_BASE = 'https://graph.facebook.com/v25.0'
 
 /**
- * Exchange short-lived token for a long-lived token (60 days).
+ * Exchange short-lived IG token for a long-lived IG token (60 days).
  */
 async function exchangeForLongLivedToken(shortToken: string): Promise<{
   access_token: string
@@ -42,9 +43,53 @@ async function fetchIgProfile(
 }
 
 /**
+ * Step 2: Fetch connected Facebook Pages using the IG user token.
+ * Returns pages with their Page Access Tokens.
+ */
+async function fetchConnectedPages(igUserToken: string): Promise<
+  Array<{ id: string; name: string; access_token: string }>
+> {
+  const url = `${GRAPH_BASE}/me/accounts?fields=id,name,access_token&access_token=${igUserToken}`
+  console.log('[IG Callback] Fetching connected pages...')
+  const res = await fetch(url)
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Failed to fetch Facebook pages: ${err}`)
+  }
+  const data = await res.json()
+  console.log(`[IG Callback] Found ${data.data?.length || 0} page(s)`)
+  return data.data || []
+}
+
+/**
+ * Step 3: Fetch Instagram Business Account ID from a Facebook Page.
+ */
+async function fetchIgBusinessId(
+  pageId: string,
+  pageAccessToken: string
+): Promise<string | null> {
+  const url = `${GRAPH_BASE}/${pageId}?fields=instagram_business_account&access_token=${pageAccessToken}`
+  console.log(`[IG Callback] Fetching IG business ID for page ${pageId}...`)
+  const res = await fetch(url)
+  if (!res.ok) {
+    const err = await res.text()
+    console.error(`[IG Callback] Failed to fetch IG business ID: ${err}`)
+    return null
+  }
+  const data = await res.json()
+  return data.instagram_business_account?.id || null
+}
+
+/**
  * GET /api/instagram/callback
  * Instagram redirects here after user authorizes the app.
- * Exchanges code for token, stores IG account, redirects to dashboard.
+ * Flow:
+ *   1. Exchange code for short-lived IG token
+ *   2. Exchange for long-lived IG token
+ *   3. Fetch IG profile
+ *   4. Fetch connected Facebook Pages → get PAGE_ACCESS_TOKEN
+ *   5. Fetch IG Business ID from the Page
+ *   6. Store everything: IG token + PAGE_ACCESS_TOKEN + page_id + ig_business_id
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -75,7 +120,6 @@ export async function GET(request: NextRequest) {
       Buffer.from(stateParam, 'base64url').toString()
     )
     userId = stateData.userId
-    // Optionally check timestamp freshness (e.g., < 10 min)
     if (Date.now() - stateData.ts > 10 * 60 * 1000) {
       throw new Error('State expired')
     }
@@ -86,14 +130,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // ─── Exchange code for short-lived token ─────────────
+    // ─── Step 1: Exchange code for short-lived IG token ───
     const tokenRes = await fetch(
       'https://api.instagram.com/oauth/access_token',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          client_id: process.env.META_APP_ID!,  // Facebook App ID
+          client_id: process.env.META_APP_ID!,
           client_secret: process.env.INSTAGRAM_APP_SECRET!,
           grant_type: 'authorization_code',
           redirect_uri: process.env.INSTAGRAM_REDIRECT_URI!,
@@ -112,17 +156,51 @@ export async function GET(request: NextRequest) {
     const shortLivedToken: string = tokenData.access_token
     const igUserIdFromToken: string = String(tokenData.user_id)
 
-    // ─── Exchange for long-lived token (60 days) ─────────
+    // ─── Step 2: Exchange for long-lived IG token (60 days)
     const longLived = await exchangeForLongLivedToken(shortLivedToken)
-    const accessToken = longLived.access_token
-    const expiresIn = longLived.expires_in // seconds (≈ 5184000 = 60 days)
+    const igAccessToken = longLived.access_token
+    const expiresIn = longLived.expires_in
 
-    // ─── Fetch IG profile ────────────────────────────────
-    const igProfile = await fetchIgProfile(accessToken)
+    // ─── Step 3: Fetch IG profile ────────────────────────
+    const igProfile = await fetchIgProfile(igAccessToken)
     const igUserId = igProfile.id || igUserIdFromToken
     const igUsername = igProfile.username
 
-    // ─── Verify user exists and check plan limits ────────
+    // ─── Step 4: Fetch connected Pages → PAGE_ACCESS_TOKEN
+    let pageId: string | null = null
+    let pageName: string | null = null
+    let pageAccessToken: string | null = null
+    let igBusinessId: string | null = null
+
+    try {
+      const pages = await fetchConnectedPages(igAccessToken)
+      if (pages.length > 0) {
+        // Try each page to find one with an IG business account
+        for (const page of pages) {
+          const bizId = await fetchIgBusinessId(page.id, page.access_token)
+          if (bizId) {
+            pageId = page.id
+            pageName = page.name
+            pageAccessToken = page.access_token
+            igBusinessId = bizId
+            console.log(
+              `[IG Callback] ✅ Found Page "${pageName}" (${pageId}) → IG Business ${igBusinessId}`
+            )
+            break
+          }
+        }
+        if (!pageAccessToken) {
+          console.warn('[IG Callback] Pages found but none have an IG business account linked')
+        }
+      } else {
+        console.warn('[IG Callback] No Facebook Pages found for this IG user token')
+      }
+    } catch (pageErr) {
+      // Non-fatal — we still have the IG token
+      console.error('[IG Callback] Page fetch failed (non-fatal):', pageErr)
+    }
+
+    // ─── Step 5: Verify user exists and check plan limits ─
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { plan: true, instagramAccounts: true },
@@ -147,18 +225,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(redirectUrl.toString())
     }
 
-    // ─── Encrypt & store token ────────────────────────────
-    const encrypted = encryptToken(accessToken)
+    // ─── Step 6: Encrypt & store IG token + Page token ────
+    const encryptedIgToken = encryptToken(igAccessToken)
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000)
+
+    // Encrypt Page Access Token separately (if we got one)
+    const encryptedPageToken = pageAccessToken
+      ? encryptToken(pageAccessToken)
+      : null
 
     const igAccount = await prisma.instagramAccount.upsert({
       where: { igUserId },
       update: {
         igUsername,
-        accessTokenEncrypted: encrypted.accessTokenEncrypted,
-        accessTokenIv: encrypted.accessTokenIv,
-        accessTokenTag: encrypted.accessTokenTag,
+        accessTokenEncrypted: encryptedIgToken.accessTokenEncrypted,
+        accessTokenIv: encryptedIgToken.accessTokenIv,
+        accessTokenTag: encryptedIgToken.accessTokenTag,
         tokenExpiresAt,
+        // Page fields
+        pageId: pageId || undefined,
+        pageName: pageName || undefined,
+        pageAccessTokenEncrypted: encryptedPageToken?.accessTokenEncrypted || undefined,
+        pageAccessTokenIv: encryptedPageToken?.accessTokenIv || undefined,
+        pageAccessTokenTag: encryptedPageToken?.accessTokenTag || undefined,
+        igBusinessId: igBusinessId || undefined,
         isActive: true,
         updatedAt: new Date(),
       },
@@ -166,10 +256,17 @@ export async function GET(request: NextRequest) {
         userId: user.id,
         igUserId,
         igUsername,
-        accessTokenEncrypted: encrypted.accessTokenEncrypted,
-        accessTokenIv: encrypted.accessTokenIv,
-        accessTokenTag: encrypted.accessTokenTag,
+        accessTokenEncrypted: encryptedIgToken.accessTokenEncrypted,
+        accessTokenIv: encryptedIgToken.accessTokenIv,
+        accessTokenTag: encryptedIgToken.accessTokenTag,
         tokenExpiresAt,
+        // Page fields
+        pageId,
+        pageName,
+        pageAccessTokenEncrypted: encryptedPageToken?.accessTokenEncrypted || null,
+        pageAccessTokenIv: encryptedPageToken?.accessTokenIv || null,
+        pageAccessTokenTag: encryptedPageToken?.accessTokenTag || null,
+        igBusinessId,
         isActive: true,
       },
     })
@@ -181,12 +278,24 @@ export async function GET(request: NextRequest) {
         action: 'INSTAGRAM_ACCOUNT_CONNECTED',
         entityType: 'InstagramAccount',
         entityId: igAccount.id,
-        details: { igUsername, igUserId },
+        details: {
+          igUsername,
+          igUserId,
+          pageId,
+          pageName,
+          igBusinessId,
+          hasPageToken: !!pageAccessToken,
+        },
         ipAddress:
           request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',
       },
     })
+
+    console.log(
+      `[IG Callback] ✅ Stored IG account @${igUsername} (${igUserId}) for user ${userId}` +
+      (pageId ? `, Page ${pageId}, IG Biz ${igBusinessId}` : ', NO page token')
+    )
 
     // ─── Redirect to dashboard with success ───────────────
     const redirectUrl = new URL('/dashboard/account', FRONTEND_URL)
@@ -195,7 +304,6 @@ export async function GET(request: NextRequest) {
   } catch (err: any) {
     console.error('Instagram callback error:', err)
 
-    // Log the failure
     try {
       await prisma.auditLog.create({
         data: {
