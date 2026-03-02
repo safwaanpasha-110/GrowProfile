@@ -74,7 +74,7 @@ const menuItems = [
 export function Sidebar() {
   const pathname = usePathname()
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null)
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const router = useRouter()
 
   const handleLogout = () => {
@@ -189,12 +189,19 @@ export function Sidebar() {
       <div className="p-4 space-y-3 border-t border-sidebar-border">
         <div className="px-4 py-3 rounded-xl bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/30">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-white">Pro Plan</span>
-            <span className="text-xs px-2 py-0.5 bg-primary rounded-full text-white">Active</span>
+            <span className="text-sm font-semibold text-white">{user?.plan?.displayName || 'Free Plan'}</span>
+            <span className="text-xs px-2 py-0.5 bg-primary rounded-full text-white">
+              {user?.subscription?.status === 'active' ? 'Active' : 'Free'}
+            </span>
           </div>
-          <p className="text-xs text-sidebar-foreground/70">10,000 DMs remaining</p>
+          <p className="text-xs text-sidebar-foreground/70">
+            {user?.instagramAccounts?.[0]
+              ? `@${user.instagramAccounts[0].igUsername} connected`
+              : 'No Instagram connected'
+            }
+          </p>
           <div className="mt-2 h-1.5 bg-sidebar-accent/30 rounded-full overflow-hidden">
-            <div className="h-full w-3/4 bg-gradient-to-r from-primary to-secondary rounded-full"></div>
+            <div className="h-full w-1/4 bg-gradient-to-r from-primary to-secondary rounded-full"></div>
           </div>
         </div>
         

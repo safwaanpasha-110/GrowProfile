@@ -1,71 +1,547 @@
 'use client'
 
-import { Instagram, Link as LinkIcon, Zap, Clock, AlertCircle, CheckCircle2, Play, Pause, Sparkles, MessageSquare, MousePointerClick, TrendingUp, ArrowRight, Plus, Hash, Send } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
+import {
+  Instagram, Zap, AlertCircle, CheckCircle2, Play, Pause,
+  Sparkles, MessageSquare, Hash, Send, Plus, Trash2,
+  RefreshCw, Eye, Loader2, Image as ImageIcon,
+  ArrowLeft
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
+
+// ─── Types ────────────────────────────────────────────────
+
+interface IgMedia {
+  id: string
+  caption?: string
+  media_type: string
+  media_url?: string
+  thumbnail_url?: string
+  permalink: string
+  timestamp: string
+  like_count?: number
+  comments_count?: number
+}
+
+interface CampaignMedia {
+  id: string
+  igMediaId: string
+  mediaUrl?: string | null
+  mediaType?: string | null
+  caption?: string | null
+  permalink?: string | null
+}
+
+interface Campaign {
+  id: string
+  name: string
+  type: string
+  status: string
+  triggerKeywords: string[]
+  replyMessage?: string | null
+  dmMessages: Array<{ text: string; delayMinutes?: number }>
+  requireFollow: boolean
+  followUpEnabled: boolean
+  followUpDelayMinutes: number
+  maxFollowUps: number
+  createdAt: string
+  media: CampaignMedia[]
+  igAccount?: { igUsername: string; igUserId: string }
+  _count: { interactions: number; leads: number }
+}
+
+type ViewMode = 'campaigns' | 'create' | 'edit'
+
+// ─── Main Component ───────────────────────────────────────
 
 export default function AutoDMPage() {
-  const [selectedPosts, setSelectedPosts] = useState<number[]>([])
-  const [keyword, setKeyword] = useState('price')
-  const [message, setMessage] = useState('')
-  const [link, setLink] = useState('')
+  const { user, authFetch } = useAuth()
+  const router = useRouter()
 
-  const posts = [
-    { id: 1, url: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?w=300&h=300&fit=crop', likes: 2450, comments: 128 },
-    { id: 2, url: 'https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=300&h=300&fit=crop', likes: 8920, comments: 456 },
-    { id: 3, url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=300&h=300&fit=crop', likes: 5670, comments: 289 },
-    { id: 4, url: 'https://images.unsplash.com/photo-1598128558393-70ff21433be0?w=300&h=300&fit=crop', likes: 12030, comments: 892 },
-    { id: 5, url: 'https://images.unsplash.com/photo-1600096194534-95cf5ece04cf?w=300&h=300&fit=crop', likes: 4330, comments: 198 },
-    { id: 6, url: 'https://images.unsplash.com/photo-1611162616475-46b635cb6868?w=300&h=300&fit=crop', likes: 7780, comments: 524 },
-  ]
+  // State
+  const [view, setView] = useState<ViewMode>('campaigns')
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [loading, setLoading] = useState(true)
+  const [igMedia, setIgMedia] = useState<IgMedia[]>([])
+  const [mediaLoading, setMediaLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
 
-  const togglePost = (id: number) => {
-    setSelectedPosts(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+  // Connected account
+  const igAccount = user?.instagramAccounts?.[0]
+
+  // Form state
+  const [campaignName, setCampaignName] = useState('')
+  const [keywords, setKeywords] = useState('')
+  const [dmMessage, setDmMessage] = useState('')
+  const [replyMessage, setReplyMessage] = useState('')
+  const [requireFollow, setRequireFollow] = useState(false)
+  const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set())
+  const [campaignStatus, setCampaignStatus] = useState<'DRAFT' | 'ACTIVE'>('ACTIVE')
+
+  // ─── Fetch campaigns ────────────────────────────────────
+
+  const fetchCampaigns = useCallback(async () => {
+    if (!igAccount) return
+    try {
+      setLoading(true)
+      const res = await authFetch(`/api/campaigns?igAccountId=${igAccount.id}`)
+      const data = await res.json()
+      if (data.success) setCampaigns(data.campaigns)
+    } catch (err) {
+      console.error('Failed to fetch campaigns:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [igAccount, authFetch])
+
+  // ─── Fetch IG media ─────────────────────────────────────
+
+  const fetchMedia = useCallback(async () => {
+    if (!igAccount) return
+    try {
+      setMediaLoading(true)
+      const res = await authFetch(`/api/instagram/media?accountId=${igAccount.id}&limit=25`)
+      const data = await res.json()
+      if (data.success) setIgMedia(data.media)
+    } catch (err) {
+      console.error('Failed to fetch media:', err)
+    } finally {
+      setMediaLoading(false)
+    }
+  }, [igAccount, authFetch])
+
+  useEffect(() => {
+    fetchCampaigns()
+  }, [fetchCampaigns])
+
+  // ─── Create/Update campaign ─────────────────────────────
+
+  const handleSaveCampaign = async () => {
+    if (!igAccount) return
+    const keywordArray = keywords.split(',').map(k => k.trim()).filter(Boolean)
+
+    if (!campaignName || keywordArray.length === 0 || !dmMessage) {
+      alert('Please fill in campaign name, at least one keyword, and a DM message.')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const payload = {
+        igAccountId: igAccount.id,
+        name: campaignName,
+        triggerKeywords: keywordArray,
+        replyMessage: replyMessage || null,
+        dmMessages: [{ text: dmMessage }],
+        requireFollow,
+        status: campaignStatus,
+        mediaIds: Array.from(selectedMediaIds).map(igMediaId => {
+          const media = igMedia.find(m => m.id === igMediaId)
+          return {
+            igMediaId,
+            mediaUrl: media?.media_url || media?.thumbnail_url || null,
+            mediaType: media?.media_type || null,
+            caption: media?.caption || null,
+            permalink: media?.permalink || null,
+          }
+        }),
+      }
+
+      const url = editingCampaign ? `/api/campaigns/${editingCampaign.id}` : '/api/campaigns'
+      const method = editingCampaign ? 'PATCH' : 'POST'
+
+      const res = await authFetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        resetForm()
+        setView('campaigns')
+        await fetchCampaigns()
+      } else {
+        alert(data.error || 'Failed to save campaign')
+      }
+    } catch (err) {
+      console.error('Save error:', err)
+      alert('Failed to save campaign')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ─── Toggle campaign status ─────────────────────────────
+
+  const toggleCampaignStatus = async (campaign: Campaign) => {
+    const newStatus = campaign.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
+    try {
+      const res = await authFetch(`/api/campaigns/${campaign.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const data = await res.json()
+      if (data.success) fetchCampaigns()
+    } catch (err) {
+      console.error('Toggle error:', err)
+    }
+  }
+
+  // ─── Delete campaign ────────────────────────────────────
+
+  const deleteCampaign = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this campaign?')) return
+    try {
+      const res = await authFetch(`/api/campaigns/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (data.success) fetchCampaigns()
+    } catch (err) {
+      console.error('Delete error:', err)
+    }
+  }
+
+  // ─── Edit campaign ──────────────────────────────────────
+
+  const startEdit = (campaign: Campaign) => {
+    setEditingCampaign(campaign)
+    setCampaignName(campaign.name)
+    setKeywords(campaign.triggerKeywords.join(', '))
+    setDmMessage(campaign.dmMessages?.[0]?.text || '')
+    setReplyMessage(campaign.replyMessage || '')
+    setRequireFollow(campaign.requireFollow)
+    setCampaignStatus(campaign.status as 'DRAFT' | 'ACTIVE')
+    setSelectedMediaIds(new Set(campaign.media.map(m => m.igMediaId)))
+    fetchMedia()
+    setView('edit')
+  }
+
+  // ─── Start creating ─────────────────────────────────────
+
+  const startCreate = () => {
+    resetForm()
+    fetchMedia()
+    setView('create')
+  }
+
+  const resetForm = () => {
+    setEditingCampaign(null)
+    setCampaignName('')
+    setKeywords('')
+    setDmMessage('')
+    setReplyMessage('')
+    setRequireFollow(false)
+    setSelectedMediaIds(new Set())
+    setCampaignStatus('ACTIVE')
+  }
+
+  const toggleMediaSelection = (mediaId: string) => {
+    setSelectedMediaIds(prev => {
+      const next = new Set(prev)
+      if (next.has(mediaId)) next.delete(mediaId)
+      else next.add(mediaId)
+      return next
+    })
+  }
+
+  // ─── Not connected ──────────────────────────────────────
+
+  if (!igAccount) {
+    return (
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-500 via-rose-500 to-orange-500 flex items-center justify-center mx-auto mb-6 shadow-xl">
+          <Instagram className="w-10 h-10 text-white" />
+        </div>
+        <h1 className="text-3xl font-bold text-foreground mb-3">Connect Your Instagram</h1>
+        <p className="text-muted-foreground mb-8 text-lg">
+          Connect your Instagram Business account to start creating AutoDM campaigns.
+        </p>
+        <Button
+          size="lg"
+          className="bg-gradient-to-r from-pink-500 via-rose-500 to-orange-500 hover:opacity-90 gap-2 shadow-xl"
+          onClick={() => router.push('/dashboard/account')}
+        >
+          <Instagram className="w-5 h-5" />
+          Connect Instagram
+        </Button>
+      </div>
     )
   }
+
+  // ─── CAMPAIGNS LIST VIEW ────────────────────────────────
+
+  if (view === 'campaigns') {
+    return (
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25">
+              <Zap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">AutoDM</h1>
+              <p className="text-muted-foreground">Automate DM responses when users comment on your posts</p>
+            </div>
+          </div>
+          <Button
+            onClick={startCreate}
+            className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 gap-2 shadow-lg shadow-primary/20"
+          >
+            <Plus className="w-4 h-4" />
+            New Campaign
+          </Button>
+        </div>
+
+        {/* Connected Account Banner */}
+        <div className="mb-8 p-5 rounded-2xl bg-gradient-to-r from-pink-50 via-rose-50 to-orange-50 dark:from-pink-950/30 dark:via-rose-950/30 dark:to-orange-950/30 border border-pink-200 dark:border-pink-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-orange-500 flex items-center justify-center shadow-lg">
+                <Instagram className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-foreground text-lg">@{igAccount.igUsername}</p>
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                    Connected
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-1 text-green-600 mt-0.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-sm font-medium">Active via Meta OAuth</span>
+                </div>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" className="rounded-xl" onClick={() => router.push('/dashboard/account')}>
+              Manage
+            </Button>
+          </div>
+        </div>
+
+        {/* Campaigns List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : campaigns.length === 0 ? (
+          /* Empty State */
+          <div className="text-center py-16 px-6 rounded-2xl bg-card border border-border">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4">
+              <MessageSquare className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-bold text-foreground mb-2">No campaigns yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Create your first AutoDM campaign to automatically respond when users comment specific keywords on your posts.
+            </p>
+            <Button onClick={startCreate} className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 gap-2">
+              <Plus className="w-4 h-4" />
+              Create Your First Campaign
+            </Button>
+
+            {/* How it works */}
+            <div className="mt-12 p-6 rounded-2xl bg-gradient-to-r from-primary/5 via-secondary/5 to-accent/5 border border-primary/20 text-left">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <h3 className="font-bold text-foreground">How AutoDM Works</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-primary">1</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground text-sm">User Comments</p>
+                    <p className="text-xs text-muted-foreground">Someone comments your keyword on your post</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-secondary">2</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground text-sm">GrowProfile Detects</p>
+                    <p className="text-xs text-muted-foreground">Our webhook engine catches the comment instantly</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-accent">3</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground text-sm">DM Sent Automatically</p>
+                    <p className="text-xs text-muted-foreground">User receives your DM with the info/link</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Campaign Cards */
+          <div className="space-y-4">
+            {campaigns.map((campaign) => (
+              <div
+                key={campaign.id}
+                className="group p-6 rounded-2xl bg-card border border-border hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      campaign.status === 'ACTIVE'
+                        ? 'bg-gradient-to-br from-green-500 to-emerald-500'
+                        : campaign.status === 'PAUSED'
+                          ? 'bg-gradient-to-br from-amber-500 to-orange-500'
+                          : 'bg-gradient-to-br from-gray-400 to-gray-500'
+                    }`}>
+                      {campaign.status === 'ACTIVE' ? (
+                        <Play className="w-4 h-4 text-white" />
+                      ) : (
+                        <Pause className="w-4 h-4 text-white" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
+                        {campaign.name}
+                      </h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {campaign.triggerKeywords.map((kw) => (
+                          <Badge key={kw} variant="secondary" className="bg-primary/10 text-primary text-xs">
+                            #{kw}
+                          </Badge>
+                        ))}
+                        <span className="text-xs text-muted-foreground">
+                          · {campaign.media.length > 0 ? `${campaign.media.length} post(s)` : 'All posts'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge className={
+                      campaign.status === 'ACTIVE'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                        : campaign.status === 'PAUSED'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300'
+                          : 'bg-gray-100 text-gray-600'
+                    }>
+                      {campaign.status}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Stats Row */}
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="p-3 rounded-xl bg-muted/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <MessageSquare className="w-4 h-4 text-primary" />
+                      <span className="text-xs font-medium text-muted-foreground">Interactions</span>
+                    </div>
+                    <p className="text-lg font-bold text-foreground">{campaign._count.interactions}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-muted/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Send className="w-4 h-4 text-secondary" />
+                      <span className="text-xs font-medium text-muted-foreground">Leads</span>
+                    </div>
+                    <p className="text-lg font-bold text-foreground">{campaign._count.leads}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-muted/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <ImageIcon className="w-4 h-4 text-accent" />
+                      <span className="text-xs font-medium text-muted-foreground">Posts</span>
+                    </div>
+                    <p className="text-lg font-bold text-foreground">
+                      {campaign.media.length || 'All'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Media Thumbnails */}
+                {campaign.media.length > 0 && (
+                  <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+                    {campaign.media.slice(0, 5).map((m) => (
+                      <div key={m.id} className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-border">
+                        {m.mediaUrl ? (
+                          <img src={m.mediaUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-muted flex items-center justify-center">
+                            <ImageIcon className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {campaign.media.length > 5 && (
+                      <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 border border-border">
+                        <span className="text-xs font-medium text-muted-foreground">+{campaign.media.length - 5}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 pt-2 border-t border-border">
+                  <Button
+                    size="sm"
+                    variant={campaign.status === 'ACTIVE' ? 'outline' : 'default'}
+                    className="gap-1.5 rounded-lg"
+                    onClick={() => toggleCampaignStatus(campaign)}
+                  >
+                    {campaign.status === 'ACTIVE' ? (
+                      <><Pause className="w-3.5 h-3.5" /> Pause</>
+                    ) : (
+                      <><Play className="w-3.5 h-3.5" /> Activate</>
+                    )}
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1.5 rounded-lg" onClick={() => startEdit(campaign)}>
+                    <Eye className="w-3.5 h-3.5" /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5 rounded-lg text-destructive hover:text-destructive ml-auto"
+                    onClick={() => deleteCampaign(campaign.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ─── CREATE / EDIT VIEW ─────────────────────────────────
 
   return (
     <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
+        <Button variant="ghost" className="gap-2 mb-4 -ml-2" onClick={() => { resetForm(); setView('campaigns') }}>
+          <ArrowLeft className="w-4 h-4" />
+          Back to Campaigns
+        </Button>
+        <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25">
             <Zap className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">AutoDM Campaign</h1>
-            <p className="text-muted-foreground">Create automated DM responses for your Instagram posts</p>
+            <h1 className="text-3xl font-bold text-foreground">
+              {editingCampaign ? 'Edit Campaign' : 'New Campaign'}
+            </h1>
+            <p className="text-muted-foreground">
+              {editingCampaign ? `Editing "${editingCampaign.name}"` : 'Set up your AutoDM automation'}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Connected Account Banner */}
-      <div className="mb-8 p-5 rounded-2xl bg-gradient-to-r from-pink-50 via-rose-50 to-orange-50 border border-pink-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-orange-500 flex items-center justify-center shadow-lg">
-              <Instagram className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="font-bold text-foreground text-lg">@yourbusiness</p>
-                <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold">Business Account</span>
-              </div>
-              <div className="flex items-center gap-1 text-green-600 mt-0.5">
-                <CheckCircle2 className="w-4 h-4" />
-                <span className="text-sm font-medium">Connected via Meta OAuth</span>
-              </div>
-            </div>
-          </div>
-          <Button variant="outline" size="sm" className="rounded-xl">
-            Manage Connection
-          </Button>
-        </div>
-      </div>
-
-      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left: Post Selector */}
         <div className="lg:col-span-2 space-y-6">
@@ -75,206 +551,204 @@ export default function AutoDMPage() {
               <div>
                 <h2 className="text-xl font-bold text-foreground mb-1">Select Posts</h2>
                 <p className="text-sm text-muted-foreground">
-                  Choose which posts should trigger AutoDM when someone comments
+                  Choose which posts trigger AutoDM (leave empty = all posts)
                 </p>
               </div>
-              {selectedPosts.length > 0 && (
-                <span className="px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-semibold">
-                  {selectedPosts.length} selected
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {selectedMediaIds.size > 0 && (
+                  <Badge className="bg-primary/10 text-primary">{selectedMediaIds.size} selected</Badge>
+                )}
+                <Button variant="outline" size="sm" className="gap-1.5 rounded-lg" onClick={fetchMedia} disabled={mediaLoading}>
+                  <RefreshCw className={`w-3.5 h-3.5 ${mediaLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {posts.map((post) => (
-                <div
-                  key={post.id}
-                  onClick={() => togglePost(post.id)}
-                  className={`relative rounded-2xl overflow-hidden cursor-pointer border-2 transition-all duration-300 group ${
-                    selectedPosts.includes(post.id)
-                      ? 'border-primary shadow-lg shadow-primary/20 scale-[1.02]'
-                      : 'border-transparent hover:border-primary/30'
-                  }`}
-                >
-                  <img
-                    src={post.url}
-                    alt={`Post ${post.id}`}
-                    className="w-full h-44 object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex flex-col justify-end p-4">
-                    <div className="flex justify-between text-sm text-white gap-2">
-                      <span className="flex items-center gap-1">❤️ {(post.likes / 1000).toFixed(1)}k</span>
-                      <span className="flex items-center gap-1">💬 {post.comments}</span>
+            {mediaLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <span className="ml-3 text-muted-foreground">Loading your posts...</span>
+              </div>
+            ) : igMedia.length === 0 ? (
+              <div className="text-center py-12">
+                <ImageIcon className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No posts found. Make sure your Instagram account has posts.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {igMedia.map((media) => {
+                  const isSelected = selectedMediaIds.has(media.id)
+                  const thumbUrl = media.media_type === 'VIDEO'
+                    ? media.thumbnail_url
+                    : media.media_url
+
+                  return (
+                    <div
+                      key={media.id}
+                      onClick={() => toggleMediaSelection(media.id)}
+                      className={`relative rounded-2xl overflow-hidden cursor-pointer border-2 transition-all duration-300 group ${
+                        isSelected
+                          ? 'border-primary shadow-lg shadow-primary/20 scale-[1.02]'
+                          : 'border-transparent hover:border-primary/30'
+                      }`}
+                    >
+                      {thumbUrl ? (
+                        <img
+                          src={thumbUrl}
+                          alt={media.caption?.substring(0, 30) || 'Post'}
+                          className="w-full h-44 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-44 bg-muted flex items-center justify-center">
+                          <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent flex flex-col justify-end p-3">
+                        <div className="flex justify-between text-xs text-white gap-2">
+                          <span>❤️ {(media.like_count || 0).toLocaleString()}</span>
+                          <span>💬 {(media.comments_count || 0).toLocaleString()}</span>
+                        </div>
+                        {media.caption && (
+                          <p className="text-[10px] text-white/70 mt-1 truncate">{media.caption}</p>
+                        )}
+                      </div>
+                      {isSelected && (
+                        <div className="absolute top-3 right-3 w-7 h-7 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                      <div className={`absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity ${
+                        isSelected ? 'opacity-100' : ''
+                      }`} />
+                      {media.media_type === 'VIDEO' && (
+                        <Badge className="absolute top-3 left-3 bg-black/60 text-white text-[10px]">VIDEO</Badge>
+                      )}
+                      {media.media_type === 'CAROUSEL_ALBUM' && (
+                        <Badge className="absolute top-3 left-3 bg-black/60 text-white text-[10px]">CAROUSEL</Badge>
+                      )}
                     </div>
-                  </div>
-                  {selectedPosts.includes(post.id) && (
-                    <div className="absolute top-3 right-3 w-7 h-7 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                      <CheckCircle2 className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  <div className={`absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity ${
-                    selectedPosts.includes(post.id) ? 'opacity-100' : ''
-                  }`}></div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex justify-center">
-              <Button variant="ghost" className="text-muted-foreground hover:text-primary gap-2">
-                <Plus className="w-4 h-4" />
-                Load More Posts
-              </Button>
-            </div>
-          </div>
-
-          {/* How It Works */}
-          <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/5 via-secondary/5 to-accent/5 border border-primary/20">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-primary" />
-              <h3 className="font-bold text-foreground">How AutoDM Works</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-primary">1</span>
-                </div>
-                <div>
-                  <p className="font-medium text-foreground text-sm">User Comments</p>
-                  <p className="text-xs text-muted-foreground">Someone comments with your keyword</p>
-                </div>
+                  )
+                })}
               </div>
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-secondary">2</span>
-                </div>
-                <div>
-                  <p className="font-medium text-foreground text-sm">Webhook Triggers</p>
-                  <p className="text-xs text-muted-foreground">Meta sends event to GrowProfile</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-accent">3</span>
-                </div>
-                <div>
-                  <p className="font-medium text-foreground text-sm">DM Sent</p>
-                  <p className="text-xs text-muted-foreground">User receives your message + link</p>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Right: Setup Panel */}
+        {/* Right: Campaign Setup */}
         <div className="space-y-6">
-          {/* Campaign Setup Card */}
           <div className="p-6 rounded-2xl bg-card border border-border">
             <h3 className="font-bold text-foreground mb-6 flex items-center gap-2">
               <Zap className="w-5 h-5 text-primary" />
               Campaign Setup
             </h3>
 
-            {selectedPosts.length === 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-sm mb-6">
-                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-amber-700">
-                  Select at least one post to configure your automation
-                </p>
-              </div>
-            )}
-
             <div className="space-y-5">
-              {/* Trigger Keyword */}
+              {/* Campaign Name */}
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Campaign Name</label>
+                <Input
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder="e.g., Price Inquiry AutoDM"
+                  className="rounded-xl"
+                />
+              </div>
+
+              {/* Trigger Keywords */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                   <Hash className="w-4 h-4 text-muted-foreground" />
                   Trigger Keywords
                 </label>
                 <Input
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
                   placeholder="price, info, link"
-                  className="rounded-xl border-border bg-background"
+                  className="rounded-xl"
                 />
-                <p className="text-xs text-muted-foreground mt-1.5">Separate multiple keywords with commas</p>
+                <p className="text-xs text-muted-foreground mt-1.5">Separate keywords with commas</p>
               </div>
 
-              {/* Message Template */}
+              {/* DM Message */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
                   <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                  DM Message Template
+                  DM Message
                 </label>
                 <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none h-28 transition-all"
-                  placeholder="Hey {name}! 👋 Thanks for your interest! Here's the info you requested..."
+                  value={dmMessage}
+                  onChange={(e) => setDmMessage(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-input bg-background text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none h-28 transition-all text-sm"
+                  placeholder="Hey! 👋 Thanks for your interest! Here's the link you asked for: https://..."
                 />
-                <p className="text-xs text-muted-foreground mt-1.5">Use {'{name}'} to personalize with username</p>
               </div>
 
-              {/* Link */}
+              {/* Public Reply */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-                  <LinkIcon className="w-4 h-4 text-muted-foreground" />
-                  Include Link (Optional)
+                  <Send className="w-4 h-4 text-muted-foreground" />
+                  Public Comment Reply (optional)
                 </label>
                 <Input
-                  value={link}
-                  onChange={(e) => setLink(e.target.value)}
-                  placeholder="https://yoursite.com/pricing"
-                  className="rounded-xl border-border bg-background"
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  placeholder="Check your DMs! 📩"
+                  className="rounded-xl"
                 />
+                <p className="text-xs text-muted-foreground mt-1.5">Auto-reply visible on the comment thread</p>
               </div>
 
-              {/* Settings Row */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Require Follow */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    Delay
-                  </label>
-                  <select className="w-full px-3 py-2.5 rounded-xl border border-border bg-background text-foreground text-sm focus:border-primary focus:outline-none">
-                    <option>Instant</option>
-                    <option>30 seconds</option>
-                    <option>1 minute</option>
-                    <option>5 minutes</option>
-                  </select>
+                  <p className="text-sm font-medium text-foreground">Require Follow</p>
+                  <p className="text-xs text-muted-foreground">Only send DM if they follow you</p>
                 </div>
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium text-foreground mb-2">
-                    <Zap className="w-4 h-4 text-muted-foreground" />
-                    Daily Limit
-                  </label>
-                  <Input
-                    type="number"
-                    defaultValue="100"
-                    className="rounded-xl border-border bg-background"
-                  />
-                </div>
+                <button
+                  onClick={() => setRequireFollow(!requireFollow)}
+                  className={`w-11 h-6 rounded-full transition-colors ${
+                    requireFollow ? 'bg-primary' : 'bg-muted-foreground/30'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${
+                    requireFollow ? 'translate-x-[22px]' : 'translate-x-[2px]'
+                  }`} />
+                </button>
               </div>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            <Button 
+            <Button
               className="w-full h-12 bg-gradient-to-r from-primary to-secondary hover:opacity-90 gap-2 rounded-xl shadow-lg shadow-primary/25 text-base"
-              disabled={selectedPosts.length === 0}
+              onClick={handleSaveCampaign}
+              disabled={saving || !campaignName || !keywords || !dmMessage}
             >
-              <Play className="w-5 h-5" />
-              Launch Campaign
+              {saving ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Saving...</>
+              ) : editingCampaign ? (
+                <><CheckCircle2 className="w-5 h-5" /> Update Campaign</>
+              ) : (
+                <><Play className="w-5 h-5" /> Launch Campaign</>
+              )}
             </Button>
-            <Button variant="outline" className="w-full h-11 gap-2 rounded-xl">
-              <Pause className="w-4 h-4" />
-              Save as Draft
-            </Button>
+            {!editingCampaign && (
+              <Button
+                variant="outline"
+                className="w-full h-11 gap-2 rounded-xl"
+                onClick={() => { setCampaignStatus('DRAFT'); handleSaveCampaign() }}
+                disabled={saving}
+              >
+                Save as Draft
+              </Button>
+            )}
           </div>
 
           {/* Preview Card */}
           <div className="p-5 rounded-2xl bg-muted/50 border border-border">
-            <p className="text-xs font-medium text-muted-foreground mb-3">PREVIEW</p>
+            <p className="text-xs font-medium text-muted-foreground mb-3">DM PREVIEW</p>
             <div className="bg-card rounded-xl p-4 border border-border">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0">
@@ -282,53 +756,19 @@ export default function AutoDMPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-foreground">
-                    {message || 'Your message will appear here...'}
+                    {dmMessage || 'Your message will appear here...'}
                   </p>
-                  {link && (
-                    <p className="text-sm text-primary mt-2 truncate">{link}</p>
-                  )}
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Campaign Stats */}
-      <div className="mt-12">
-        <h2 className="text-xl font-bold text-foreground mb-6">Campaign Performance</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="p-6 rounded-2xl bg-card border border-border hover:border-primary/30 hover:shadow-lg transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-sm text-muted-foreground mb-1">Total Campaigns</p>
-            <p className="text-3xl font-bold text-foreground">3</p>
-            <p className="text-xs text-green-600 font-medium mt-2">+1 this month</p>
-          </div>
-          <div className="p-6 rounded-2xl bg-card border border-border hover:border-primary/30 hover:shadow-lg transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-secondary to-accent flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <MessageSquare className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-sm text-muted-foreground mb-1">DMs Sent</p>
-            <p className="text-3xl font-bold text-foreground">2,847</p>
-            <p className="text-xs text-green-600 font-medium mt-2">+892 this week</p>
-          </div>
-          <div className="p-6 rounded-2xl bg-card border border-border hover:border-primary/30 hover:shadow-lg transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-primary flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <MousePointerClick className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-sm text-muted-foreground mb-1">Link Clicks</p>
-            <p className="text-3xl font-bold text-foreground">1,234</p>
-            <p className="text-xs text-green-600 font-medium mt-2">43.3% click rate</p>
-          </div>
-          <div className="p-6 rounded-2xl bg-card border border-border hover:border-primary/30 hover:shadow-lg transition-all group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <TrendingUp className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-sm text-muted-foreground mb-1">Success Rate</p>
-            <p className="text-3xl font-bold text-foreground">98.2%</p>
-            <p className="text-xs text-green-600 font-medium mt-2">Delivery success</p>
+            {replyMessage && (
+              <>
+                <p className="text-xs font-medium text-muted-foreground mb-2 mt-4">PUBLIC REPLY PREVIEW</p>
+                <div className="bg-card rounded-xl p-3 border border-border">
+                  <p className="text-xs text-foreground">↳ {replyMessage}</p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

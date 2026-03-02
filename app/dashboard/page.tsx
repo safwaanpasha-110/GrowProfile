@@ -1,3 +1,5 @@
+'use client'
+
 import { WelcomeCard } from '@/components/dashboard/WelcomeCard'
 import { StatsGrid } from '@/components/dashboard/StatsGrid'
 import { CampaignsList } from '@/components/dashboard/CampaignsList'
