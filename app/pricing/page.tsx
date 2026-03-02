@@ -93,10 +93,10 @@ export default function PricingPage() {
             </Link>
             <div className="flex gap-3">
               <Button variant="ghost" asChild>
-                <Link href="/login">Log in</Link>
+                <Link href="/auth/login">Log in</Link>
               </Button>
               <Button asChild className="bg-primary hover:bg-primary/90">
-                <Link href="/signup">Start Free Trial</Link>
+                <Link href="/auth/signup">Start Free Trial</Link>
               </Button>
             </div>
           </div>
@@ -192,7 +192,7 @@ export default function PricingPage() {
             Start growing today
           </h2>
           <p className="text-xl text-white/90 mb-8">
-            Join thousands of creators automating their Instagram growth
+            Start automating your Instagram engagement and turn every comment into a personalized DM.
           </p>
           <Button asChild size="lg" className="bg-white text-primary hover:bg-slate-100">
             <Link href="/signup" className="flex items-center gap-2">
@@ -205,36 +205,19 @@ export default function PricingPage() {
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white py-12 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
-                <span className="font-bold text-slate-900">GrowProfile</span>
-              </div>
-              <p className="text-sm text-slate-600">Grow your Instagram with intelligent automation</p>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 pb-8 border-b border-slate-200">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
+              <span className="font-bold text-slate-900">GrowProfile</span>
             </div>
-            <div>
-              <p className="font-semibold text-slate-900 mb-4">Product</p>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="/#features" className="text-slate-600 hover:text-primary">Features</Link></li>
-                <li><Link href="/pricing" className="text-slate-600 hover:text-primary">Pricing</Link></li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-900 mb-4">Company</p>
-              <ul className="space-y-2 text-sm">
-                <li><Link href="/faq" className="text-slate-600 hover:text-primary">About</Link></li>
-              </ul>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-900 mb-4">Legal</p>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-slate-600 hover:text-primary">Privacy</a></li>
-              </ul>
+            <div className="flex gap-6 text-sm">
+              <Link href="/#features" className="text-slate-600 hover:text-primary">Features</Link>
+              <Link href="/pricing" className="text-slate-600 hover:text-primary">Pricing</Link>
+              <Link href="/faq" className="text-slate-600 hover:text-primary">FAQ</Link>
             </div>
           </div>
-          <div className="border-t border-slate-200 pt-8">
-            <p className="text-center text-sm text-slate-600">© 2024 GrowProfile. All rights reserved.</p>
+          <div className="pt-6">
+            <p className="text-center text-sm text-slate-600">© 2026 GrowProfile. All rights reserved.</p>
           </div>
         </div>
       </footer>

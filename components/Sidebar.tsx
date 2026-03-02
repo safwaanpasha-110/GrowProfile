@@ -203,9 +203,6 @@ export function Sidebar() {
               : 'No Instagram connected'
             }
           </p>
-          <div className="mt-2 h-1.5 bg-sidebar-accent/30 rounded-full overflow-hidden">
-            <div className="h-full w-1/4 bg-gradient-to-r from-primary to-secondary rounded-full"></div>
-          </div>
         </div>
         
         <button 

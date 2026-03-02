@@ -72,16 +72,7 @@ export function HeroSection() {
               </Button>
             </div>
             
-            <div className="flex items-center gap-4 text-sm text-slate-500">
-              <div className="flex -space-x-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 border-2 border-white flex items-center justify-center text-xs font-medium text-slate-600">
-                    {String.fromCharCode(64 + i)}
-                  </div>
-                ))}
-              </div>
-              <span>Growing Instagram businesses with <strong className="text-slate-700">AutoDM</strong></span>
-            </div>
+
           </div>
 
           {/* Right: Dashboard Preview */}
