@@ -1,14 +1,25 @@
 'use client'
 
 import Link from 'next/link'
-import { CheckCircle2, ArrowRight } from 'lucide-react'
+import Image from 'next/image'
+import { CheckCircle2, ArrowRight, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ScrollReveal, AnimatedCounter } from '@/components/landing/ScrollReveal'
+import { useState, useEffect } from 'react'
 
 export default function PricingPage() {
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   const plans = [
     {
       name: 'Starter',
-      price: '$0',
+      price: 0,
       period: '/month',
       description: 'Perfect for getting started with automation',
       cta: 'Start Free',
@@ -20,11 +31,12 @@ export default function PricingPage() {
         'Email support',
         '7-day free trial'
       ],
-      highlighted: false
+      highlighted: false,
+      gradient: 'from-slate-500 to-slate-600',
     },
     {
       name: 'Pro',
-      price: '$29',
+      price: 29,
       period: '/month',
       description: 'For creators serious about growth',
       cta: 'Start Free Trial',
@@ -39,11 +51,12 @@ export default function PricingPage() {
         'Smart scheduling',
         'Growth tracking dashboard'
       ],
-      highlighted: true
+      highlighted: true,
+      gradient: 'from-primary to-secondary',
     },
     {
       name: 'Agency',
-      price: '$99',
+      price: 99,
       period: '/month',
       description: 'For managing multiple accounts',
       cta: 'Contact Sales',
@@ -58,7 +71,8 @@ export default function PricingPage() {
         'White-label options',
         'SLA guarantee'
       ],
-      highlighted: false
+      highlighted: false,
+      gradient: 'from-accent to-primary',
     }
   ]
 
@@ -82,20 +96,30 @@ export default function PricingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
       {/* Header */}
-      <nav className="sticky top-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-xl">
+      <nav className={`sticky top-0 z-50 transition-all duration-500 ${
+        scrolled
+          ? 'bg-white/90 backdrop-blur-xl border-b border-slate-200/50 shadow-lg shadow-slate-900/[0.03]'
+          : 'bg-white/60 backdrop-blur-md border-b border-transparent'
+      }`}>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
-              <span className="text-xl font-bold text-slate-900">GrowProfile</span>
+            <Link href="/" className="flex items-center gap-3 group">
+              <Image
+                src="/images/logo.png"
+                alt="ScorpixMedia Logo"
+                width={36}
+                height={36}
+                className="rounded-xl shadow-md group-hover:scale-105 transition-all duration-300"
+              />
+              <span className="text-xl font-bold text-slate-900 group-hover:text-primary transition-colors duration-300">GrowProfile</span>
             </Link>
             <div className="flex gap-3">
-              <Button variant="ghost" asChild>
+              <Button variant="ghost" asChild className="text-slate-700 hover:text-primary hover:bg-primary/5 transition-all duration-300">
                 <Link href="/auth/login">Log in</Link>
               </Button>
-              <Button asChild className="bg-primary hover:bg-primary/90">
+              <Button asChild className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
                 <Link href="/auth/signup">Start Free Trial</Link>
               </Button>
             </div>
@@ -104,120 +128,163 @@ export default function PricingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-5xl font-bold text-slate-900 mb-6">
-            Simple, transparent <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">pricing</span>
-          </h1>
-          <p className="text-xl text-slate-600 mb-4">
-            Choose the perfect plan for your Instagram growth goals
-          </p>
-          <p className="text-sm text-slate-600">
-            All plans include a 14-day free trial. No credit card required.
-          </p>
-        </div>
+      <section className="py-20 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsl(270_84%_55%_/_0.04)_0%,transparent_50%)]"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,hsl(210_100%_50%_/_0.04)_0%,transparent_50%)]"></div>
+        
+        <ScrollReveal direction="up">
+          <div className="max-w-3xl mx-auto text-center relative">
+            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary/10 border border-primary/20 rounded-full mb-6 shimmer-border">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold text-primary">Simple Pricing</span>
+            </div>
+            <h1 className="text-5xl md:text-6xl font-bold text-slate-900 mb-6 tracking-tight">
+              Simple, transparent{' '}
+              <span className="anim-gradient-text">pricing</span>
+            </h1>
+            <p className="text-xl text-slate-600 mb-4">
+              Choose the perfect plan for your Instagram growth goals
+            </p>
+            <p className="text-sm text-slate-500">
+              All plans include a 14-day free trial. No credit card required.
+            </p>
+          </div>
+        </ScrollReveal>
       </section>
 
       {/* Pricing Cards */}
       <section className="py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           {plans.map((plan, idx) => (
-            <div
-              key={idx}
-              className={`rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col ${
-                plan.highlighted
-                  ? 'border-primary shadow-2xl md:scale-105 bg-white'
-                  : 'border-slate-200 bg-white hover:border-primary/50 hover:shadow-lg'
-              }`}
-            >
-              {plan.highlighted && (
-                <div className="h-1 bg-gradient-to-r from-primary to-secondary"></div>
-              )}
-              <div className="p-8 flex-1">
-                <h3 className="text-2xl font-bold text-slate-900 mb-2">{plan.name}</h3>
-                <p className="text-sm text-slate-600 mb-6">{plan.description}</p>
-                
-                <div className="mb-6">
-                  <span className="text-5xl font-bold text-slate-900">{plan.price}</span>
-                  <span className="text-slate-600 ml-2">{plan.period}</span>
-                </div>
-
-                <Button
-                  asChild
-                  className={`w-full mb-8 ${
-                    plan.highlighted
-                      ? 'bg-primary hover:bg-primary/90'
-                      : 'border-slate-300 hover:bg-slate-50'
-                  }`}
-                  variant={plan.highlighted ? 'default' : 'outline'}
-                >
-                  <Link href="/signup">{plan.cta}</Link>
-                </Button>
-
-                <div className="space-y-4">
-                  {plan.features.map((feature, fidx) => (
-                    <div key={fidx} className="flex gap-3 items-start">
-                      <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-slate-700">{feature}</span>
+            <ScrollReveal key={idx} delay={idx * 120} direction="up" scale>
+              <div
+                className={`rounded-2xl border transition-all duration-500 overflow-hidden flex flex-col tilt-card group ${
+                  plan.highlighted
+                    ? 'border-primary/30 shadow-2xl md:scale-105 bg-white relative'
+                    : 'border-slate-200/80 bg-white hover:border-primary/30 hover:shadow-xl'
+                }`}
+              >
+                {plan.highlighted && (
+                  <>
+                    <div className="absolute -top-px -left-px -right-px h-[3px] bg-gradient-to-r from-primary via-secondary to-accent animate-gradient-x" style={{ backgroundSize: '200% 100%' }}></div>
+                    <div className="absolute top-4 right-4 px-3 py-1 bg-gradient-to-r from-primary to-secondary text-white text-xs font-bold rounded-full shadow-lg">
+                      Most Popular
                     </div>
-                  ))}
+                  </>
+                )}
+                <div className="p-8 flex-1">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-2 group-hover:text-primary transition-colors duration-300">{plan.name}</h3>
+                  <p className="text-sm text-slate-600 mb-6">{plan.description}</p>
+                  
+                  <div className="mb-6">
+                    <span className="text-5xl font-bold text-slate-900">
+                      {plan.price === 0 ? '$0' : <><span className="text-slate-400 text-3xl">$</span><AnimatedCounter end={plan.price} duration={1500} /></>}
+                    </span>
+                    <span className="text-slate-500 ml-2">{plan.period}</span>
+                  </div>
+
+                  <Button
+                    asChild
+                    className={`w-full mb-8 transition-all duration-300 hover:-translate-y-0.5 ${
+                      plan.highlighted
+                        ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg shadow-primary/25 hover:shadow-xl'
+                        : 'border-slate-300 hover:bg-slate-50 hover:border-primary/30'
+                    }`}
+                    variant={plan.highlighted ? 'default' : 'outline'}
+                  >
+                    <Link href="/auth/signup">{plan.cta}</Link>
+                  </Button>
+
+                  <div className="space-y-4">
+                    {plan.features.map((feature, fidx) => (
+                      <div key={fidx} className="flex gap-3 items-start group/item">
+                        <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0 mt-0.5 group-hover/item:scale-110 transition-transform duration-200" />
+                        <span className="text-sm text-slate-700">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            </ScrollReveal>
           ))}
         </div>
       </section>
 
       {/* FAQ */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-4xl font-bold text-slate-900 text-center mb-12">
-            Frequently Asked Questions
-          </h2>
-          <div className="space-y-6">
+      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(270_84%_55%_/_0.03)_0%,transparent_50%)]"></div>
+        <div className="max-w-3xl mx-auto relative">
+          <ScrollReveal direction="up">
+            <h2 className="text-4xl md:text-5xl font-bold text-slate-900 text-center mb-4 tracking-tight">
+              Frequently Asked <span className="anim-gradient-text">Questions</span>
+            </h2>
+            <p className="text-center text-slate-500 mb-12">Everything you need to know about our pricing</p>
+          </ScrollReveal>
+          <div className="space-y-4">
             {faqs.map((faq, idx) => (
-              <div key={idx} className="border border-slate-200 rounded-lg p-6 hover:border-primary/50 transition-colors">
-                <h3 className="text-lg font-semibold text-slate-900 mb-3">{faq.question}</h3>
-                <p className="text-slate-600">{faq.answer}</p>
-              </div>
+              <ScrollReveal key={idx} delay={idx * 80} direction="up">
+                <div className="border border-slate-200/80 rounded-2xl p-6 hover:border-primary/30 hover:shadow-lg transition-all duration-300 bg-white group">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-3 group-hover:text-primary transition-colors duration-300">{faq.question}</h3>
+                  <p className="text-slate-600 leading-relaxed">{faq.answer}</p>
+                </div>
+              </ScrollReveal>
             ))}
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="py-20 bg-gradient-to-r from-primary via-secondary to-accent px-4">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-white mb-6">
-            Start growing today
-          </h2>
-          <p className="text-xl text-white/90 mb-8">
-            Start automating your Instagram engagement and turn every comment into a personalized DM.
-          </p>
-          <Button asChild size="lg" className="bg-white text-primary hover:bg-slate-100">
-            <Link href="/signup" className="flex items-center gap-2">
-              Get Started Free <ArrowRight className="w-5 h-5" />
-            </Link>
-          </Button>
-        </div>
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-accent animate-gradient-x" style={{ backgroundSize: '200% 100%' }}></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#fff1_1px,transparent_1px),linear-gradient(to_bottom,#fff1_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+        <div className="absolute top-0 left-1/4 w-[30rem] h-[30rem] bg-white/10 rounded-full blur-3xl animate-morph"></div>
+        <div className="absolute bottom-0 right-1/4 w-[30rem] h-[30rem] bg-white/10 rounded-full blur-3xl animate-morph" style={{ animationDelay: '-4s' }}></div>
+        
+        <ScrollReveal direction="up">
+          <div className="max-w-3xl mx-auto text-center relative px-4">
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">
+              Start growing today
+            </h2>
+            <p className="text-xl text-white/90 mb-8">
+              Start automating your Instagram engagement and turn every comment into a personalized DM.
+            </p>
+            <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90 shadow-2xl hover:-translate-y-1 hover:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3)] transition-all duration-300 group">
+              <Link href="/auth/signup" className="flex items-center gap-2">
+                Get Started Free <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+              </Link>
+            </Button>
+          </div>
+        </ScrollReveal>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-12 px-4">
+      <footer className="border-t border-slate-200/80 bg-white py-12 px-4">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6 pb-8 border-b border-slate-200">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
-              <span className="font-bold text-slate-900">GrowProfile</span>
-            </div>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6 pb-8 border-b border-slate-200/80">
+            <Link href="/" className="flex items-center gap-3 group">
+              <Image
+                src="/images/logo.png"
+                alt="ScorpixMedia Logo"
+                width={28}
+                height={28}
+                className="rounded-lg group-hover:scale-110 transition-transform duration-300"
+              />
+              <span className="font-bold text-slate-900 group-hover:text-primary transition-colors duration-300">GrowProfile</span>
+            </Link>
             <div className="flex gap-6 text-sm">
-              <Link href="/#features" className="text-slate-600 hover:text-primary">Features</Link>
-              <Link href="/pricing" className="text-slate-600 hover:text-primary">Pricing</Link>
-              <Link href="/faq" className="text-slate-600 hover:text-primary">FAQ</Link>
+              {[
+                { label: 'Features', href: '/#features' },
+                { label: 'Pricing', href: '/pricing' },
+                { label: 'FAQ', href: '/faq' },
+              ].map((link) => (
+                <Link key={link.label} href={link.href} className="text-slate-600 hover:text-primary transition-colors duration-300 underline-grow inline-block">
+                  {link.label}
+                </Link>
+              ))}
             </div>
           </div>
           <div className="pt-6">
-            <p className="text-center text-sm text-slate-600">© 2026 GrowProfile. All rights reserved.</p>
+            <p className="text-center text-sm text-slate-500">&copy; 2026 GrowProfile. All rights reserved.</p>
           </div>
         </div>
       </footer>
