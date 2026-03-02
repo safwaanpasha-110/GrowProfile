@@ -1,9 +1,10 @@
 name: Deploy GrowProfile
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  # CI/CD temporarily disabled — re-enable when ready for production
+  # push:
+  #   branches: [main]
+  # workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
