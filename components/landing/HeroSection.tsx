@@ -146,11 +146,6 @@ export function HeroSection() {
                 </div>
               </div>
             </div>
-            
-            {/* Floating Elements */}
-            <div className="absolute -top-4 -right-4 w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-xl float">
-              <Sparkles className="w-8 h-8 text-white" />
-            </div>
           </div>
         </div>
       </div>
