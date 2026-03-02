@@ -6,6 +6,7 @@ import { Users, BarChart3, CreditCard, Settings, LogOut, Menu, ScrollText, Shiel
 import { useAuth } from '@/contexts/AuthContext'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import Image from 'next/image'
 
 const menuItems = [
   {
@@ -74,7 +75,13 @@ export default function AdminSidebar() {
       >
         <div className="p-6">
           <Link href="/admin" className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-secondary flex-shrink-0"></div>
+            <Image
+              src="/images/logo.png"
+              alt="GrowProfile Logo"
+              width={40}
+              height={40}
+              className="rounded-xl flex-shrink-0"
+            />
             {isOpen && <span className="font-bold text-lg">GrowProfile</span>}
           </Link>
         </div>

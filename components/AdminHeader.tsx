@@ -32,7 +32,9 @@ export default function AdminHeader() {
             onClick={() => setShowMenu(!showMenu)}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-2"
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-full"></div>
+            <div className="w-8 h-8 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center">
+              <span className="text-white text-xs font-bold">{user?.email?.charAt(0).toUpperCase()}</span>
+            </div>
             <span className="text-sm font-medium text-slate-900">{user?.email}</span>
           </button>
 

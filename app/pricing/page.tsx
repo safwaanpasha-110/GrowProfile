@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { CheckCircle2, ArrowRight, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ScrollReveal, AnimatedCounter } from '@/components/landing/ScrollReveal'
+import { ScrollReveal } from '@/components/landing/ScrollReveal'
 import { useState, useEffect } from 'react'
 
 export default function PricingPage() {
@@ -18,80 +18,98 @@ export default function PricingPage() {
 
   const plans = [
     {
-      name: 'Starter',
+      name: 'Free',
+      introPrice: null,
       price: 0,
       period: '/month',
-      description: 'Perfect for getting started with automation',
-      cta: 'Start Free',
+      description: 'Try GrowProfile at no cost, forever',
+      cta: 'Get Started Free',
+      ctaHref: '/auth/signup',
       features: [
-        'Up to 100 DM sends per month',
+        'Up to 50 DM sends per month',
         '1 active campaign',
-        'Basic analytics',
-        'Manual audience insights',
-        'Email support',
-        '7-day free trial'
+        'Basic analytics dashboard',
+        'Comment keyword triggers',
+        'Single DM template',
+        'Community support',
+        'No credit card required'
       ],
       highlighted: false,
+      isEnterprise: false,
       gradient: 'from-slate-500 to-slate-600',
     },
     {
       name: 'Pro',
-      price: 29,
-      period: '/month',
+      introPrice: 2.99,
+      price: 5,
+      period: '/month after',
       description: 'For creators serious about growth',
-      cta: 'Start Free Trial',
+      cta: 'Start for $2.99',
+      ctaHref: '/auth/signup',
       features: [
         'Up to 10,000 DM sends per month',
         'Unlimited active campaigns',
-        'Advanced analytics & reporting',
+        'Advanced analytics & conversion tracking',
         'AI-powered audience insights',
-        'Priority email support',
-        '14-day free trial',
-        'Custom DM templates',
-        'Smart scheduling',
-        'Growth tracking dashboard'
+        'Priority email & chat support',
+        'Custom DM templates library',
+        'Smart scheduling & delay controls',
+        'Growth tracking dashboard',
+        'A/B testing for DM messages',
+        'Export reports (CSV/PDF)'
       ],
       highlighted: true,
+      isEnterprise: false,
       gradient: 'from-primary to-secondary',
     },
     {
-      name: 'Agency',
-      price: 99,
-      period: '/month',
-      description: 'For managing multiple accounts',
-      cta: 'Contact Sales',
+      name: 'Enterprise',
+      introPrice: null,
+      price: -1,
+      period: '',
+      description: 'Custom solutions for agencies & high-volume brands',
+      cta: "Let's have a call",
+      ctaHref: 'mailto:hello@scorpixmedia.com?subject=Enterprise Plan Enquiry',
       features: [
-        'Unlimited DM sends',
-        'Unlimited accounts',
-        'Everything in Pro',
-        'Dedicated account manager',
-        '24/7 priority support',
-        'Custom integrations',
-        'API access',
-        'White-label options',
-        'SLA guarantee'
+        'Unlimited DM sends per month',
+        'Unlimited accounts & campaigns',
+        'Everything in Pro included',
+        'Multi-account management portal',
+        'Dedicated success manager',
+        '24/7 priority phone & chat support',
+        'Full API access & webhooks',
+        'Custom integrations (Zapier, HubSpot, Slack)',
+        'White-label & custom branding',
+        'Advanced team collaboration',
+        'SLA guarantee (99.9% uptime)',
+        'Custom onboarding & training session'
       ],
       highlighted: false,
+      isEnterprise: true,
       gradient: 'from-accent to-primary',
     }
   ]
 
   const faqs = [
     {
+      question: 'How does the Pro plan introductory pricing work?',
+      answer: 'Your first month on Pro is just $2.99 — after that it renews at $5/month. No hidden fees, cancel anytime.'
+    },
+    {
       question: 'Can I cancel my subscription anytime?',
-      answer: 'Yes, you can cancel your subscription at any time. Your access will be active until the end of your billing cycle.'
+      answer: 'Yes, cancel anytime from your account settings. Your access remains active until the end of your current billing period.'
     },
     {
-      question: 'Is there a free trial?',
-      answer: 'Yes! All paid plans include a 14-day free trial. No credit card required to get started.'
+      question: 'Is there a free plan?',
+      answer: 'Yes! The Free plan lets you send up to 50 DMs per month with 1 active campaign — no credit card required, forever free.'
     },
     {
-      question: 'Do you offer annual billing discounts?',
-      answer: 'Yes, we offer 20% off when you choose annual billing. Contact us for details.'
+      question: 'What does the Enterprise plan include?',
+      answer: 'Enterprise is fully custom — unlimited accounts, white-labelling, API access, a dedicated success manager, and a direct line to our team. Book a call and we will tailor a plan to your needs.'
     },
     {
       question: 'What payment methods do you accept?',
-      answer: 'We accept all major credit cards, PayPal, and bank transfers for enterprise plans.'
+      answer: 'We accept all major credit and debit cards via Stripe. Enterprise customers can also pay via bank transfer or invoice.'
     }
   ]
 
@@ -120,7 +138,7 @@ export default function PricingPage() {
                 <Link href="/auth/login">Log in</Link>
               </Button>
               <Button asChild className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-                <Link href="/auth/signup">Start Free Trial</Link>
+                <Link href="/auth/signup">Get Started Free</Link>
               </Button>
             </div>
           </div>
@@ -143,11 +161,13 @@ export default function PricingPage() {
               <span className="anim-gradient-text">pricing</span>
             </h1>
             <p className="text-xl text-slate-600 mb-4">
-              Choose the perfect plan for your Instagram growth goals
+              Start free, scale when ready. No tricks, no lock-ins.
             </p>
-            <p className="text-sm text-slate-500">
-              All plans include a 14-day free trial. No credit card required.
-            </p>
+            <div className="flex flex-wrap justify-center gap-4 mt-2">
+              <span className="text-sm text-slate-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Free plan forever</span>
+              <span className="text-sm text-slate-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Pro from $2.99 first month</span>
+              <span className="text-sm text-slate-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Cancel anytime</span>
+            </div>
           </div>
         </ScrollReveal>
       </section>
@@ -176,24 +196,44 @@ export default function PricingPage() {
                   <h3 className="text-2xl font-bold text-slate-900 mb-2 group-hover:text-primary transition-colors duration-300">{plan.name}</h3>
                   <p className="text-sm text-slate-600 mb-6">{plan.description}</p>
                   
-                  <div className="mb-6">
-                    <span className="text-5xl font-bold text-slate-900">
-                      {plan.price === 0 ? '$0' : <><span className="text-slate-400 text-3xl">$</span><AnimatedCounter end={plan.price} duration={1500} /></>}
-                    </span>
-                    <span className="text-slate-500 ml-2">{plan.period}</span>
+                  <div className="mb-1">
+                    {plan.price === -1 ? (
+                      <div className="text-4xl font-bold text-slate-900">Custom</div>
+                    ) : plan.introPrice ? (
+                      <>
+                        <div className="flex items-end gap-2">
+                          <span className="text-slate-400 text-3xl font-bold">$</span>
+                          <span className="text-5xl font-bold text-slate-900">{plan.introPrice}</span>
+                          <span className="text-slate-500 mb-1">first month</span>
+                        </div>
+                        <div className="text-sm text-slate-400 mt-1">
+                          then <span className="font-semibold text-slate-600">${plan.price}/mo</span> after
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-slate-400 text-3xl font-bold">$</span>
+                        <span className="text-5xl font-bold text-slate-900">0</span>
+                        <span className="text-slate-500 ml-2">/month</span>
+                      </>
+                    )}
                   </div>
 
-                  <Button
-                    asChild
-                    className={`w-full mb-8 transition-all duration-300 hover:-translate-y-0.5 ${
-                      plan.highlighted
-                        ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg shadow-primary/25 hover:shadow-xl'
-                        : 'border-slate-300 hover:bg-slate-50 hover:border-primary/30'
-                    }`}
-                    variant={plan.highlighted ? 'default' : 'outline'}
-                  >
-                    <Link href="/auth/signup">{plan.cta}</Link>
-                  </Button>
+                  <div className="mb-8 mt-6">
+                    <Button
+                      asChild
+                      className={`w-full transition-all duration-300 hover:-translate-y-0.5 ${
+                        plan.highlighted
+                          ? 'bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg shadow-primary/25 hover:shadow-xl'
+                          : plan.isEnterprise
+                          ? 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-xl border-0'
+                          : 'border-slate-300 hover:bg-slate-50 hover:border-primary/30'
+                      }`}
+                      variant={plan.highlighted || plan.isEnterprise ? 'default' : 'outline'}
+                    >
+                      <Link href={plan.ctaHref}>{plan.cta}</Link>
+                    </Button>
+                  </div>
 
                   <div className="space-y-4">
                     {plan.features.map((feature, fidx) => (
@@ -243,10 +283,10 @@ export default function PricingPage() {
         <ScrollReveal direction="up">
           <div className="max-w-3xl mx-auto text-center relative px-4">
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 tracking-tight">
-              Start growing today
+              Start for free, grow at your pace
             </h2>
             <p className="text-xl text-white/90 mb-8">
-              Start automating your Instagram engagement and turn every comment into a personalized DM.
+              Free forever. Pro from just $2.99 your first month, then $5/mo. No contracts, cancel anytime.
             </p>
             <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90 shadow-2xl hover:-translate-y-1 hover:shadow-[0_20px_60px_-10px_rgba(0,0,0,0.3)] transition-all duration-300 group">
               <Link href="/auth/signup" className="flex items-center gap-2">
