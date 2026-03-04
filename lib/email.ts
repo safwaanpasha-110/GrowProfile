@@ -27,7 +27,7 @@ interface EmailResult {
 
 export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
   const apiKey = process.env.RESEND_API_KEY
-  const fromAddress = options.from || process.env.EMAIL_FROM || 'GrowProfile <noreply@growprofile.com>'
+  const fromAddress = options.from || process.env.EMAIL_FROM || 'GrowProfile <noreply@growprofile.in>'
 
   if (!apiKey) {
     // Dev mode: log to console

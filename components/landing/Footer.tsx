@@ -57,11 +57,14 @@ export function Footer() {
             <div>
               <p className="font-semibold text-white mb-4">Legal</p>
               <ul className="space-y-3 text-sm">
-                {['Privacy Policy', 'Terms of Service', 'Cookie Policy', 'GDPR'].map((label) => (
-                  <li key={label}>
-                    <a href="#" className="text-slate-400 hover:text-white transition-colors duration-300 underline-grow inline-block">
-                      {label}
-                    </a>
+                {[
+                  { label: 'Privacy Policy', href: '/privacy' },
+                  { label: 'Terms of Service', href: '/terms' },
+                ].map((link) => (
+                  <li key={link.label}>
+                    <Link href={link.href} className="text-slate-400 hover:text-white transition-colors duration-300 underline-grow inline-block">
+                      {link.label}
+                    </Link>
                   </li>
                 ))}
               </ul>

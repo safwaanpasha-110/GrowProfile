@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { encryptToken } from '@/lib/encryption'
 import { subscribeToWebhooks } from '@/lib/instagram-api'
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://growprofile.in'
 const GRAPH_BASE = 'https://graph.facebook.com/v25.0'
 
 /**

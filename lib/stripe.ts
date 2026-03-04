@@ -65,6 +65,6 @@ export function buildUrl(path: string): string {
   const base =
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.FRONTEND_URL ||
-    'http://localhost:4000'
+    'https://growprofile.in'
   return `${base.replace(/\/$/, '')}${path}`
 }
