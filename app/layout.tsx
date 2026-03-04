@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 
 import './globals.css'
@@ -10,11 +10,12 @@ export const metadata: Metadata = {
   title: 'GrowProfile - Instagram AutoDM by ScorpixMedia',
   description: 'Turn Instagram comments into customers with automated DM campaigns. Meta-compliant AutoDM platform by ScorpixMedia.',
   generator: 'v0.app',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-  },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 import { AuthProvider } from '@/contexts/AuthContext'
