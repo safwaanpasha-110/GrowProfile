@@ -7,11 +7,19 @@
 import Razorpay from 'razorpay'
 import crypto from 'crypto'
 
-const keyId     = process.env.RAZORPAY_KEY_ID     || ''
-const keySecret = process.env.RAZORPAY_KEY_SECRET || ''
+// Lazy singleton — avoids constructing at build time when env vars are missing
+function getRazorpay(): Razorpay {
+  const keyId     = process.env.RAZORPAY_KEY_ID     || ''
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || ''
 
-if (process.env.NODE_ENV === 'production' && (!keyId || !keySecret)) {
-  throw new Error('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are required in production')
+  if (!keyId || !keySecret) {
+    throw new Error('Razorpay is not configured: set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET')
+  }
+
+  if (!global._razorpay) {
+    global._razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret })
+  }
+  return global._razorpay
 }
 
 declare global {
@@ -19,13 +27,18 @@ declare global {
   var _razorpay: Razorpay | undefined
 }
 
-const razorpay: Razorpay =
-  global._razorpay ||
-  new Razorpay({ key_id: keyId, key_secret: keySecret })
-
-if (process.env.NODE_ENV !== 'production') {
-  global._razorpay = razorpay
-}
+// Proxy so callers can still `import razorpay from '@/lib/razorpay'`
+// without triggering construction at import time or during next build.
+const razorpay = new Proxy({} as Razorpay, {
+  get(_target, prop, receiver) {
+    if (prop === '__esModule' || prop === 'then' || typeof prop === 'symbol') {
+      return undefined
+    }
+    const instance = getRazorpay()
+    const value = Reflect.get(instance, prop, receiver)
+    return typeof value === 'function' ? value.bind(instance) : value
+  },
+})
 
 export default razorpay
 
@@ -42,6 +55,7 @@ export function verifyPaymentSignature(
   paymentId: string,
   signature: string,
 ): boolean {
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || ''
   if (!keySecret) return false
   const hmac = crypto.createHmac('sha256', keySecret)
   hmac.update(`${orderId}|${paymentId}`)

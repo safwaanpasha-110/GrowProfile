@@ -15,6 +15,9 @@ COPY . .
 # Generate Prisma client
 RUN pnpm exec prisma generate
 
+# Prisma 7 "prisma-client" generator no longer emits index.ts — create a barrel
+RUN echo 'export * from "./client"' > lib/generated/prisma/index.ts
+
 # Build Next.js (standalone output)
 RUN pnpm build
 
@@ -31,8 +34,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Copy Prisma schema + generated client
+# Copy Prisma schema + generated client + config
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/lib/generated ./lib/generated
 
 # Copy workers, scripts, and lib modules (needed by worker containers)

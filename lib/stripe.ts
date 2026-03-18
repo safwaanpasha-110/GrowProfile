@@ -7,28 +7,38 @@
  */
 import Stripe from 'stripe'
 
-const key = process.env.STRIPE_SECRET_KEY
-
-if (!key && process.env.NODE_ENV === 'production') {
-  throw new Error('STRIPE_SECRET_KEY is required in production')
-}
-
 // Singleton pattern — avoids creating multiple instances during hot-reloads in dev
 declare global {
   // eslint-disable-next-line no-var
   var _stripe: Stripe | undefined
 }
 
-const stripe: Stripe =
-  global._stripe ||
-  new Stripe(key || 'sk_test_placeholder', {
-    apiVersion: '2026-02-25.clover',
-    typescript: true,
-  })
-
-if (process.env.NODE_ENV !== 'production') {
-  global._stripe = stripe
+function getStripe(): Stripe {
+  if (!global._stripe) {
+    const key = process.env.STRIPE_SECRET_KEY
+    if (!key) {
+      throw new Error('Stripe is not configured: set STRIPE_SECRET_KEY')
+    }
+    global._stripe = new Stripe(key, {
+      apiVersion: '2026-02-25.clover',
+      typescript: true,
+    })
+  }
+  return global._stripe
 }
+
+// Proxy so callers can still `import stripe from '@/lib/stripe'`
+// without triggering construction at import time or during next build.
+const stripe = new Proxy({} as Stripe, {
+  get(_target, prop, receiver) {
+    if (prop === '__esModule' || prop === 'then' || typeof prop === 'symbol') {
+      return undefined
+    }
+    const instance = getStripe()
+    const value = Reflect.get(instance, prop, receiver)
+    return typeof value === 'function' ? value.bind(instance) : value
+  },
+})
 
 export default stripe
 

@@ -238,7 +238,11 @@ export async function fetchMediaComments(
     ? `https://graph.instagram.com/${IG_MESSAGING_VERSION}/${mediaId}/comments?fields=id,text,username,timestamp,from&limit=50&access_token=${accessToken}`
     : `${IG_API_BASE}/${mediaId}/comments?fields=id,text,from,timestamp&limit=50&access_token=${accessToken}`
 
-  while (url && allComments.length < limit) {
+  const MAX_PAGES = 10
+  let pageCount = 0
+
+  while (url && allComments.length < limit && pageCount < MAX_PAGES) {
+    pageCount++
     const res: Response = await fetch(url)
     if (!res.ok) {
       const err = await res.text()
@@ -266,8 +270,8 @@ export async function fetchMediaComments(
       allComments.push(...normalized)
     }
 
-    // Follow pagination cursor
-    url = data.paging?.next || null
+    // Follow pagination cursor (but stop at MAX_PAGES)
+    url = (data.paging?.next && pageCount < MAX_PAGES) ? data.paging.next : null
   }
 
   return allComments.slice(0, limit)
