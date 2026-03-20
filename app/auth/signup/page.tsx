@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { CheckCircle2 } from 'lucide-react'
 import { SignupForm } from '@/components/auth/SignupForm'
@@ -18,9 +19,18 @@ export default function SignupPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Left: Features */}
           <div className="flex flex-col justify-center md:py-12">
-            <Link href="/" className="inline-flex items-center gap-2 mb-8 w-fit">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
-              <span className="text-2xl font-bold text-slate-900">GrowProfile</span>
+            <Link href="/" className="inline-flex items-center gap-3 mb-8 w-fit">
+              <Image
+                src="/images/logo-20260320-v4.png"
+                alt="GrowProfile Logo"
+                width={40}
+                height={40}
+                className="rounded-xl shadow-md"
+              />
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold text-slate-900">GrowProfile</span>
+                <span className="text-xs text-slate-500">by ScorpixMedia</span>
+              </div>
             </Link>
             <h2 className="text-4xl font-bold text-slate-900 mb-6">
               Start growing your Instagram today
