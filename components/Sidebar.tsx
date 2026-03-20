@@ -91,7 +91,7 @@ export function Sidebar() {
       <div className="p-6 border-b border-sidebar-border">
         <Link href="/dashboard" className="flex items-center gap-3 group">
           <Image
-            src="/images/logo.png"
+            src="/images/logo-20260320.png"
             alt="ScorpixMedia Logo"
             width={40}
             height={40}
