@@ -32,7 +32,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
             <Image
-              src="/images/logo-20260320-v2.png"
+              src="/images/logo-20260320-v4.png"
               alt="ScorpixMedia Logo"
               width={48}
               height={48}
@@ -92,7 +92,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           <div className="lg:hidden text-center mb-8">
             <Link href="/" className="inline-flex items-center gap-3 mb-6">
               <Image
-                  src="/images/logo-20260320-v2.png"
+                  src="/images/logo-20260320-v4.png"
                 alt="ScorpixMedia Logo"
                 width={48}
                 height={48}

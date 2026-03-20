@@ -125,7 +125,7 @@ export default function PricingPage() {
           <div className="flex items-center justify-between py-4">
             <Link href="/" className="flex items-center gap-3 group">
               <Image
-                src="/images/logo-20260320-v2.png"
+                src="/images/logo-20260320-v4.png"
                 alt="ScorpixMedia Logo"
                 width={36}
                 height={36}
@@ -303,7 +303,7 @@ export default function PricingPage() {
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 pb-8 border-b border-slate-200/80">
             <Link href="/" className="flex items-center gap-3 group">
               <Image
-                src="/images/logo-20260320-v2.png"
+                src="/images/logo-20260320-v4.png"
                 alt="ScorpixMedia Logo"
                 width={28}
                 height={28}
