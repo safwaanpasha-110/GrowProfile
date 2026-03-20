@@ -11,7 +11,7 @@ export default function SupportPage() {
       title: 'Email Support',
       description: 'Get help via email within 24 hours',
       action: 'Send Email',
-      href: 'mailto:support@growprofile.com'
+      href: 'mailto:support@growprofile.in'
     },
     {
       icon: MessageSquare,

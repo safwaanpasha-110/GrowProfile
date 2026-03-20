@@ -121,7 +121,7 @@ export async function sendWelcomeEmail(params: {
   name: string
 }): Promise<EmailResult> {
   const { to, name } = params
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.com'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.in'
 
   return sendEmail({
     to,
@@ -153,7 +153,7 @@ export async function sendCampaignAlert(params: {
   reason?: string
 }): Promise<EmailResult> {
   const { to, name, campaignName, status, reason } = params
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.com'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.in'
 
   const statusText = {
     ACTIVE: 'is now active and sending DMs',
@@ -190,7 +190,7 @@ export async function sendWeeklyDigest(params: {
   }
 }): Promise<EmailResult> {
   const { to, name, stats } = params
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.com'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.in'
 
   return sendEmail({
     to,
@@ -231,7 +231,7 @@ export async function sendUsageLimitWarning(params: {
   percentage: number
 }): Promise<EmailResult> {
   const { to, name, resourceName, current, limit, percentage } = params
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.com'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.in'
 
   return sendEmail({
     to,
@@ -274,6 +274,6 @@ export async function sendSuspensionEmail(params: {
       <p>If you believe this is a mistake, please contact our support team by replying to this email.</p>
     `),
     text: `Your GrowProfile account has been suspended. Reason: ${reason}`,
-    replyTo: 'support@growprofile.com',
+    replyTo: 'support@growprofile.in',
   })
 }

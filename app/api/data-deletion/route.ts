@@ -82,5 +82,6 @@ export async function GET() {
     status: 'ok',
     message: 'GrowProfile Data Deletion endpoint. Send a POST request with { email } to request data deletion.',
     contact: 'support@growprofile.in',
+    generalContact: 'info@growprofile.in',
   })
 }

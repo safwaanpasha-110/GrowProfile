@@ -89,7 +89,7 @@ export default function FAQPage() {
         },
         {
           q: 'How do I contact support?',
-          a: 'You can reach our support team via email, live chat, or the help center. Response times vary by plan tier.'
+          a: 'You can reach our support team at support@growprofile.in. For general or business enquiries, email info@growprofile.in. Response times vary by plan tier.'
         }
       ]
     }
@@ -176,10 +176,10 @@ export default function FAQPage() {
             Can't find what you're looking for?
           </h2>
           <p className="text-xl text-slate-600 mb-8">
-            Reach out to our support team - we're here to help!
+            Reach out to our support team at support@growprofile.in or contact info@growprofile.in for general enquiries.
           </p>
           <Button asChild size="lg" className="bg-primary hover:bg-primary/90">
-            <a href="mailto:support@growprofile.com" className="flex items-center gap-2">
+            <a href="mailto:support@growprofile.in" className="flex items-center gap-2">
               Contact Support <ArrowRight className="w-5 h-5" />
             </a>
           </Button>

@@ -69,7 +69,7 @@ export default function PricingPage() {
       period: '',
       description: 'Custom solutions for agencies & high-volume brands',
       cta: "Let's have a call",
-      ctaHref: 'mailto:hello@scorpixmedia.com?subject=Enterprise Plan Enquiry',
+      ctaHref: 'mailto:info@growprofile.in?subject=Enterprise Plan Enquiry',
       features: [
         'Unlimited DM sends per month',
         'Unlimited accounts & campaigns',

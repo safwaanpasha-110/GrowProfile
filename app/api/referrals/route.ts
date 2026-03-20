@@ -30,7 +30,7 @@ export const GET = withAuth(async (_request: NextRequest, user: AuthUser) => {
     prisma.referral.count({ where: { referrerId: user.id, rewardApplied: true } }),
   ])
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.com'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://growprofile.in'
   const referralLink = `${baseUrl}/auth/signup?ref=${referralCode}`
 
   return NextResponse.json({

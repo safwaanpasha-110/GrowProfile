@@ -121,7 +121,7 @@ async function seedSettings() {
 
     // Email
     email_from_name: 'GrowProfile',
-    email_from_address: 'hello@growprofile.com',
+    email_from_address: 'info@growprofile.in',
     weekly_digest_enabled: true,
 
     // Instagram / Meta

@@ -109,7 +109,8 @@ export default function DataDeletionPage() {
               For any questions about data deletion or privacy, contact us:
             </p>
             <ul className="list-none pl-0 space-y-1 text-slate-700 mt-3">
-              <li><strong>Email:</strong> <a href="mailto:support@growprofile.in" className="text-primary underline">support@growprofile.in</a></li>
+              <li><strong>Support:</strong> <a href="mailto:support@growprofile.in" className="text-primary underline">support@growprofile.in</a></li>
+              <li><strong>General Enquiries:</strong> <a href="mailto:info@growprofile.in" className="text-primary underline">info@growprofile.in</a></li>
               <li><strong>Website:</strong> <Link href="/" className="text-primary underline">https://growprofile.in</Link></li>
             </ul>
           </section>

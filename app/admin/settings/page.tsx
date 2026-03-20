@@ -18,8 +18,8 @@ const SETTING_GROUPS = [
     title: 'General Settings',
     fields: [
       { key: 'platform_name', label: 'Platform Name', type: 'text', default: 'GrowProfile' },
-      { key: 'support_email', label: 'Support Email', type: 'email', default: 'support@growprofile.com' },
-      { key: 'api_base_url', label: 'API Base URL', type: 'text', default: 'https://api.growprofile.com' },
+      { key: 'support_email', label: 'Support Email', type: 'email', default: 'support@growprofile.in' },
+      { key: 'api_base_url', label: 'API Base URL', type: 'text', default: 'https://growprofile.in' },
     ],
   },
   {

@@ -157,7 +157,8 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-semibold text-slate-900 mb-4">11. Contact</h2>
             <p className="text-slate-700 leading-relaxed">For any privacy-related questions or data requests:</p>
             <ul className="list-none pl-0 space-y-1 text-slate-700 mt-3">
-              <li><strong>Email:</strong> support@growprofile.in</li>
+              <li><strong>Support:</strong> support@growprofile.in</li>
+              <li><strong>General Enquiries:</strong> info@growprofile.in</li>
               <li><strong>Website:</strong> <Link href="/" className="text-primary underline">https://growprofile.in</Link></li>
               <li><strong>Data Deletion:</strong> <Link href="/data-deletion" className="text-primary underline">https://growprofile.in/data-deletion</Link></li>
             </ul>
