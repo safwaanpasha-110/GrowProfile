@@ -25,7 +25,7 @@ export function Navigation() {
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative">
               <Image
-                src="/images/logo-20260320.png"
+                src="/images/logo-20260320-v2.png"
                 alt="ScorpixMedia Logo"
                 width={40}
                 height={40}

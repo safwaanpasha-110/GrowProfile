@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/images/logo-20260320.png" alt="GrowProfile Logo" width={36} height={36} className="rounded-lg" />
+              <Image src="/images/logo-20260320-v2.png" alt="GrowProfile Logo" width={36} height={36} className="rounded-lg" />
               <span className="text-xl font-bold text-slate-900">GrowProfile</span>
             </Link>
             <div className="flex gap-3">

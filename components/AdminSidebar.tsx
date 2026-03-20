@@ -76,7 +76,7 @@ export default function AdminSidebar() {
         <div className="p-6">
           <Link href="/admin" className="flex items-center gap-3">
             <Image
-              src="/images/logo-20260320.png"
+              src="/images/logo-20260320-v2.png"
               alt="GrowProfile Logo"
               width={40}
               height={40}

@@ -18,7 +18,7 @@ export function Footer() {
             <div className="lg:col-span-2">
               <Link href="/" className="flex items-center gap-3 mb-6 group">
                 <Image
-                  src="/images/logo-20260320.png"
+                  src="/images/logo-20260320-v2.png"
                   alt="ScorpixMedia Logo"
                   width={40}
                   height={40}
