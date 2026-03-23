@@ -309,12 +309,11 @@ const worker = new Worker<DmJobData>(
         if (messageIndex === 0 && commentId) {
           try {
             const result = await sendPrivateReply(
-              igUserId,
               commentId,
               messageText,
               igUserToken
             )
-            console.log(`[DmSender] Sent private reply (msg_id: ${result.message_id})`)
+            console.log(`[DmSender] Sent private reply`)
 
             await prisma.interaction.update({
               where: { id: interactionId },

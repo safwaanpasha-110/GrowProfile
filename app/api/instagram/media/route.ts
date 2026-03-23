@@ -74,11 +74,11 @@ export const GET = withAuth(async (request: NextRequest, user: AuthUser) => {
         apiIgId = account.igBusinessId
         apiBase = 'https://graph.facebook.com/v25.0'
       } else {
-        apiBase = 'https://graph.instagram.com/v21.0'
+        apiBase = 'https://graph.instagram.com/v25.0'
       }
     } else {
       // No Page token — use IG user token with graph.instagram.com
-      apiBase = 'https://graph.instagram.com/v21.0'
+      apiBase = 'https://graph.instagram.com/v25.0'
     }
 
     const url = new URL(`${apiBase}/${apiIgId}/media`)

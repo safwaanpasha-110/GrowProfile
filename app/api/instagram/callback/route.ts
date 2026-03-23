@@ -33,11 +33,7 @@ async function exchangeForLongLivedToken(shortToken: string): Promise<{
 async function fetchIgProfile(
   accessToken: string
 ): Promise<{ id: string; username: string }> {
-  // Use `id` (not `user_id`) — `id` is the OAuth-scoped IG user ID required
-  // by graph.instagram.com/{id}/messages for sending DMs.
-  // `user_id` returns the FB-side IG Business Account ID which does NOT work
-  // with graph.instagram.com messaging endpoints.
-  const url = `https://graph.instagram.com/v21.0/me?fields=id,username&access_token=${accessToken}`
+  const url = `https://graph.instagram.com/v25.0/me?fields=id,username&access_token=${accessToken}`
   const res = await fetch(url)
   if (!res.ok) {
     const err = await res.text()
@@ -48,53 +44,13 @@ async function fetchIgProfile(
 }
 
 /**
- * Step 2: Fetch connected Facebook Pages using the IG user token.
- * Returns pages with their Page Access Tokens.
- */
-async function fetchConnectedPages(igUserToken: string): Promise<
-  Array<{ id: string; name: string; access_token: string }>
-> {
-  const url = `${GRAPH_BASE}/me/accounts?fields=id,name,access_token&access_token=${igUserToken}`
-  console.log('[IG Callback] Fetching connected pages...')
-  const res = await fetch(url)
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Failed to fetch Facebook pages: ${err}`)
-  }
-  const data = await res.json()
-  console.log(`[IG Callback] Found ${data.data?.length || 0} page(s)`)
-  return data.data || []
-}
-
-/**
- * Step 3: Fetch Instagram Business Account ID from a Facebook Page.
- */
-async function fetchIgBusinessId(
-  pageId: string,
-  pageAccessToken: string
-): Promise<string | null> {
-  const url = `${GRAPH_BASE}/${pageId}?fields=instagram_business_account&access_token=${pageAccessToken}`
-  console.log(`[IG Callback] Fetching IG business ID for page ${pageId}...`)
-  const res = await fetch(url)
-  if (!res.ok) {
-    const err = await res.text()
-    console.error(`[IG Callback] Failed to fetch IG business ID: ${err}`)
-    return null
-  }
-  const data = await res.json()
-  return data.instagram_business_account?.id || null
-}
-
-/**
  * GET /api/instagram/callback
  * Instagram redirects here after user authorizes the app.
  * Flow:
  *   1. Exchange code for short-lived IG token
  *   2. Exchange for long-lived IG token
- *   3. Fetch IG profile
- *   4. Fetch connected Facebook Pages → get PAGE_ACCESS_TOKEN
- *   5. Fetch IG Business ID from the Page
- *   6. Store everything: IG token + PAGE_ACCESS_TOKEN + page_id + ig_business_id
+ *   3. Fetch IG profile (gets the IG Business ID directly)
+ *   4. Store everything: IG token
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -166,46 +122,20 @@ export async function GET(request: NextRequest) {
     const igAccessToken = longLived.access_token
     const expiresIn = longLived.expires_in
 
-    // ─── Step 3: Fetch IG profile ────────────────────────
+    // ─── Step 3: Fetch IG profile (gets the IG Business ID directly)
     const igProfile = await fetchIgProfile(igAccessToken)
     const igUserId = igProfile.id || igUserIdFromToken
     const igUsername = igProfile.username
 
-    // ─── Step 4: Fetch connected Pages → PAGE_ACCESS_TOKEN
-    let pageId: string | null = null
-    let pageName: string | null = null
-    let pageAccessToken: string | null = null
-    let igBusinessId: string | null = null
-
-    try {
-      const pages = await fetchConnectedPages(igAccessToken)
-      if (pages.length > 0) {
-        // Try each page to find one with an IG business account
-        for (const page of pages) {
-          const bizId = await fetchIgBusinessId(page.id, page.access_token)
-          if (bizId) {
-            pageId = page.id
-            pageName = page.name
-            pageAccessToken = page.access_token
-            igBusinessId = bizId
-            console.log(
-              `[IG Callback] ✅ Found Page "${pageName}" (${pageId}) → IG Business ${igBusinessId}`
-            )
-            break
-          }
-        }
-        if (!pageAccessToken) {
-          console.warn('[IG Callback] Pages found but none have an IG business account linked')
-        }
-      } else {
-        console.warn('[IG Callback] No Facebook Pages found for this IG user token')
-      }
-    } catch (pageErr) {
-      // Non-fatal — we still have the IG token
-      console.error('[IG Callback] Page fetch failed (non-fatal):', pageErr)
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[IG Callback] ⚠️ App is in Dev Mode: Only data from App Testers is visible. Comments/Messages from other users will return empty or throw errors. Ensure the testing Instagram account's associated Facebook account is added as a 'Tester' in your App Dashboard.`)
     }
 
-    // ─── Step 5: Verify user exists and check plan limits ─
+    // With Instagram Login for Business, 'me' refers directly to the IG Business Account
+    // so igProfile.id is the igBusinessId
+    const igBusinessId = igProfile.id
+
+    // ─── Step 4: Verify user exists and check plan limits ─
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { plan: true, instagramAccounts: true },
@@ -230,14 +160,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(redirectUrl.toString())
     }
 
-    // ─── Step 6: Encrypt & store IG token + Page token ────
+    // ─── Step 5: Encrypt & store IG token ────
     const encryptedIgToken = encryptToken(igAccessToken)
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000)
-
-    // Encrypt Page Access Token separately (if we got one)
-    const encryptedPageToken = pageAccessToken
-      ? encryptToken(pageAccessToken)
-      : null
 
     const igAccount = await prisma.instagramAccount.upsert({
       where: { igUserId },
@@ -247,12 +172,6 @@ export async function GET(request: NextRequest) {
         accessTokenIv: encryptedIgToken.accessTokenIv,
         accessTokenTag: encryptedIgToken.accessTokenTag,
         tokenExpiresAt,
-        // Page fields
-        pageId: pageId || undefined,
-        pageName: pageName || undefined,
-        pageAccessTokenEncrypted: encryptedPageToken?.accessTokenEncrypted || undefined,
-        pageAccessTokenIv: encryptedPageToken?.accessTokenIv || undefined,
-        pageAccessTokenTag: encryptedPageToken?.accessTokenTag || undefined,
         igBusinessId: igBusinessId || undefined,
         isActive: true,
         updatedAt: new Date(),
@@ -265,12 +184,6 @@ export async function GET(request: NextRequest) {
         accessTokenIv: encryptedIgToken.accessTokenIv,
         accessTokenTag: encryptedIgToken.accessTokenTag,
         tokenExpiresAt,
-        // Page fields
-        pageId,
-        pageName,
-        pageAccessTokenEncrypted: encryptedPageToken?.accessTokenEncrypted || null,
-        pageAccessTokenIv: encryptedPageToken?.accessTokenIv || null,
-        pageAccessTokenTag: encryptedPageToken?.accessTokenTag || null,
         igBusinessId,
         isActive: true,
       },
@@ -286,10 +199,7 @@ export async function GET(request: NextRequest) {
         details: {
           igUsername,
           igUserId,
-          pageId,
-          pageName,
           igBusinessId,
-          hasPageToken: !!pageAccessToken,
         },
         ipAddress:
           request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown',
@@ -298,8 +208,7 @@ export async function GET(request: NextRequest) {
     })
 
     console.log(
-      `[IG Callback] ✅ Stored IG account @${igUsername} (${igUserId}) for user ${userId}` +
-      (pageId ? `, Page ${pageId}, IG Biz ${igBusinessId}` : ', NO page token')
+      `[IG Callback] ✅ Stored IG account @${igUsername} (${igUserId}) for user ${userId} → IG Biz ${igBusinessId}`
     )
 
     // ─── Step 7: Subscribe to webhooks (comments + messages) ─

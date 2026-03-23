@@ -8,7 +8,7 @@ const IG_API_BASE = `https://graph.facebook.com/${IG_API_VERSION}`
 
 // IG Business Login messaging uses graph.instagram.com (NOT graph.facebook.com).
 // The instagram_business_manage_messages scope only works at this endpoint.
-const IG_MESSAGING_VERSION = 'v21.0'
+const IG_MESSAGING_VERSION = 'v25.0'
 const IG_MESSAGING_BASE = `https://graph.instagram.com/${IG_MESSAGING_VERSION}`
 
 // ─── Types ────────────────────────────────────────────────
@@ -106,30 +106,24 @@ export async function replyToComment(
 
 /**
  * Send a private (DM) reply to a comment.
- * Uses: POST /{ig-user-id}/messages at graph.instagram.com with recipient.comment_id
- * Requires: instagram_business_manage_messages scope (IG Business Login)
+ * Uses: POST /{comment-id}/private_replies at graph.facebook.com
  *
- * IMPORTANT: Use the IG User Token from OAuth (NOT the Page Access Token).
- *
- * @param igUserId - The IG user ID from IG Business Login OAuth
  * @param commentId - The comment ID to privately reply to
  * @param messageText - The DM text
  * @param accessToken - The IG User Token
  */
 export async function sendPrivateReply(
-  igUserId: string,
   commentId: string,
   messageText: string,
   accessToken: string
-): Promise<IgSendMessageResult> {
-  const url = `${IG_MESSAGING_BASE}/${igUserId}/messages`
+) {
+  const url = `${IG_API_BASE}/${commentId}/private_replies`
 
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      recipient: { comment_id: commentId },
-      message: { text: messageText },
+      message: messageText, // The text of your Auto-DM
       access_token: accessToken,
     }),
   })
@@ -290,18 +284,19 @@ export async function fetchMediaComments(
 export async function subscribeToWebhooks(
   igUserId: string,
   accessToken: string,
-  subscribedFields: string[] = ['comments', 'messages', 'messaging_postbacks']
+  subscribedFields: string = 'comments,messages'
 ): Promise<boolean> {
   // Subscribe the IG user's page to the app's webhooks
   const url = `${IG_API_BASE}/${igUserId}/subscribed_apps`
 
+  const body = new URLSearchParams({
+    subscribed_fields: subscribedFields,
+    access_token: accessToken,
+  })
+
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      subscribed_fields: subscribedFields,
-      access_token: accessToken,
-    }),
+    body,
   })
 
   if (!res.ok) {
@@ -324,8 +319,7 @@ export async function unsubscribeFromWebhooks(
 
   const res = await fetch(url, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ access_token: accessToken }),
+    body: new URLSearchParams({ access_token: accessToken }),
   })
 
   if (!res.ok) {
