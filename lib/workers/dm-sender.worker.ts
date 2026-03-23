@@ -69,6 +69,7 @@ interface DmJobData {
   igAccountId: string
   userId: string
   recipientId: string
+  recipientUsername?: string // Used for {{name}} substitution
   messageText: string
   messageIndex: number
   totalMessages: number
@@ -213,13 +214,18 @@ const worker = new Worker<DmJobData>(
       igAccountId,
       userId,
       recipientId,
-      messageText,
+      recipientUsername,
+      messageText: rawMessageText,
       messageIndex,
       totalMessages,
       requireFollow,
       commentId,
       replyMessage,
     } = job.data
+
+    // Substitute {{name}} with the commenter's username (or a friendly fallback)
+    const recipientName = recipientUsername || 'there'
+    const messageText = rawMessageText.replace(/\{\{name\}\}/g, recipientName)
 
     console.log(`[DmSender] Job ${job.id} — Sending message ${messageIndex + 1}/${totalMessages} to ${recipientId}`)
 
@@ -277,19 +283,19 @@ const worker = new Worker<DmJobData>(
     } else {
       // ─── PRODUCTION: Send real DMs via Instagram API ─
 
-      // Get both tokens — igUserToken for DMs, pageToken for comment replies
-      const { igUserToken, pageToken, igUserId } = await getAccountTokens(igAccountId)
+      // Get tokens — igUserToken for all IG Business Login API calls
+      const { igUserToken, igUserId } = await getAccountTokens(igAccountId)
 
       const interactionMetadata = await getInteractionMetadata(interactionId)
 
       // First message: Send public comment reply if configured
-      // Uses Page Token at graph.facebook.com/{comment-id}/replies
+      // Uses IG User Token at graph.instagram.com/{comment-id}/replies
       if (messageIndex === 0 && replyMessage && commentId) {
         if (interactionMetadata.publicReplySent) {
           console.log(`[DmSender] Public comment reply already sent for interaction ${interactionId} — skipping`)
         } else {
           try {
-            const replyResult = await replyToComment(commentId, replyMessage, pageToken || igUserToken)
+            const replyResult = await replyToComment(commentId, replyMessage, igUserToken)
             console.log(`[DmSender] Sent public comment reply to ${commentId}`)
             await mergeInteractionMetadata(interactionId, {
               publicReplySent: true,
@@ -309,6 +315,7 @@ const worker = new Worker<DmJobData>(
         if (messageIndex === 0 && commentId) {
           try {
             const result = await sendPrivateReply(
+              igUserId,
               commentId,
               messageText,
               igUserToken
@@ -416,6 +423,7 @@ const worker = new Worker<DmJobData>(
               igAccountId,
               userId,
               recipientId,
+              recipientUsername,
               messageText: nextMessage.text,
               messageIndex: messageIndex + 1,
               totalMessages,

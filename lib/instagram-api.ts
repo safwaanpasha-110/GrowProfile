@@ -70,28 +70,30 @@ export async function sendInstagramDM(
 // ─── Reply to a comment ────────────────────────────────────
 
 /**
- * Post a reply to a comment on an IG media.
- * Uses: POST /{ig-user-id}/messages (for private reply) OR
- *       POST /{comment-id}/replies for public reply
+ * Post a public reply to a comment on an IG media.
+ * Uses: POST /{comment-id}/replies at graph.instagram.com
+ * Requires: instagram_business_manage_comments scope (IG Business Login)
  *
  * @param commentId - The comment to reply to
  * @param message - The reply text
- * @param accessToken - Page/IG access token
+ * @param accessToken - IG User Token (from Instagram Business Login)
  */
 export async function replyToComment(
   commentId: string,
   message: string,
   accessToken: string
 ): Promise<IgCommentReplyResult> {
-  const url = `${IG_API_BASE}/${commentId}/replies`
+  // Must use graph.instagram.com with the IG User Token — the FB graph endpoint
+  // requires a Page Access Token which IG Business Login does not provide.
+  const url = `${IG_MESSAGING_BASE}/${commentId}/replies`
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ message }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message,
+      access_token: accessToken,
+    }),
   })
 
   if (!res.ok) {
@@ -105,25 +107,33 @@ export async function replyToComment(
 // ─── Send private reply to a comment ───────────────────────
 
 /**
- * Send a private (DM) reply to a comment.
- * Uses: POST /{comment-id}/private_replies at graph.facebook.com
+ * Send a private DM reply to a comment via the Instagram Messaging API.
+ * Uses: POST /{ig-user-id}/messages with recipient.comment_id at graph.instagram.com
+ * Requires: instagram_business_manage_messages scope (IG Business Login)
  *
+ * This is the correct endpoint for Instagram Login for Business.
+ * The old graph.facebook.com/{comment-id}/private_replies endpoint requires a
+ * Facebook Page Access Token which is NOT available with IG Business Login.
+ *
+ * @param igUserId - The IG user ID of the business account sending the DM
  * @param commentId - The comment ID to privately reply to
  * @param messageText - The DM text
- * @param accessToken - The IG User Token
+ * @param accessToken - The IG User Token (from Instagram Business Login)
  */
 export async function sendPrivateReply(
+  igUserId: string,
   commentId: string,
   messageText: string,
   accessToken: string
-) {
-  const url = `${IG_API_BASE}/${commentId}/private_replies`
+): Promise<IgSendMessageResult> {
+  const url = `${IG_MESSAGING_BASE}/${igUserId}/messages`
 
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      message: messageText, // The text of your Auto-DM
+      recipient: { comment_id: commentId },
+      message: { text: messageText },
       access_token: accessToken,
     }),
   })
@@ -274,20 +284,21 @@ export async function fetchMediaComments(
 // ─── Subscribe to webhooks ─────────────────────────────────
 
 /**
- * Subscribe an Instagram account to webhook events.
- * Uses the App-level subscription endpoint.
- * This should be called once during app setup, not per-user.
+ * Subscribe an Instagram account to user-level webhook events.
+ * Uses graph.instagram.com which accepts the IG User Token from Business Login.
  *
- * Per-user webhook subscriptions are handled through the
- * Instagram API's page subscribed apps endpoint.
+ * This MUST be called per-user after OAuth so Meta sends webhooks
+ * where entry.id matches the user's igUserId (app-scoped ID).
+ * Without this, Meta sends webhooks with the global IG User ID which
+ * may not match the app-scoped ID we store.
  */
 export async function subscribeToWebhooks(
   igUserId: string,
   accessToken: string,
   subscribedFields: string = 'comments,messages'
 ): Promise<boolean> {
-  // Subscribe the IG user's page to the app's webhooks
-  const url = `${IG_API_BASE}/${igUserId}/subscribed_apps`
+  // Must use graph.instagram.com — graph.facebook.com rejects IG User Tokens
+  const url = `${IG_MESSAGING_BASE}/${igUserId}/subscribed_apps`
 
   const body = new URLSearchParams({
     subscribed_fields: subscribedFields,
@@ -315,7 +326,7 @@ export async function unsubscribeFromWebhooks(
   igUserId: string,
   accessToken: string
 ): Promise<boolean> {
-  const url = `${IG_API_BASE}/${igUserId}/subscribed_apps`
+  const url = `${IG_MESSAGING_BASE}/${igUserId}/subscribed_apps`
 
   const res = await fetch(url, {
     method: 'DELETE',

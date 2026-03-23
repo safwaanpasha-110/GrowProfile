@@ -185,6 +185,7 @@ async function processComment(job: Job<WebhookJobData>) {
         igAccountId,
         userId,
         recipientId: commentEvent.from.id,
+        recipientUsername: commentEvent.from.username || undefined,
         messageText: dmMessages[0].text,
         messageIndex: 0,
         totalMessages: dmMessages.length,

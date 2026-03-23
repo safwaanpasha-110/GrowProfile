@@ -29,18 +29,20 @@ async function exchangeForLongLivedToken(shortToken: string): Promise<{
 
 /**
  * Fetch the Instagram user profile.
+ * Returns both the app-scoped `id` (for API calls) and the global `user_id`
+ * (which Meta uses as entry.id in webhook payloads).
  */
 async function fetchIgProfile(
   accessToken: string
-): Promise<{ id: string; username: string }> {
-  const url = `https://graph.instagram.com/v25.0/me?fields=id,username&access_token=${accessToken}`
+): Promise<{ id: string; userId: string; username: string }> {
+  const url = `https://graph.instagram.com/v25.0/me?fields=id,user_id,username&access_token=${accessToken}`
   const res = await fetch(url)
   if (!res.ok) {
     const err = await res.text()
     throw new Error(`IG profile fetch failed: ${err}`)
   }
   const data = await res.json()
-  return { id: data.id, username: data.username }
+  return { id: data.id, userId: String(data.user_id || data.id), username: data.username }
 }
 
 /**
@@ -124,16 +126,10 @@ export async function GET(request: NextRequest) {
 
     // ─── Step 3: Fetch IG profile (gets the IG Business ID directly)
     const igProfile = await fetchIgProfile(igAccessToken)
-    const igUserId = igProfile.id || igUserIdFromToken
+    const igUserId = igProfile.id || igUserIdFromToken  // App-scoped ID — used for API calls
     const igUsername = igProfile.username
-
-    if (process.env.NODE_ENV === 'development') {
-      console.warn(`[IG Callback] ⚠️ App is in Dev Mode: Only data from App Testers is visible. Comments/Messages from other users will return empty or throw errors. Ensure the testing Instagram account's associated Facebook account is added as a 'Tester' in your App Dashboard.`)
-    }
-
-    // With Instagram Login for Business, 'me' refers directly to the IG Business Account
-    // so igProfile.id is the igBusinessId
-    const igBusinessId = igProfile.id
+    // Global user_id — this is what Meta sends as entry.id in webhook payloads
+    const igBusinessId = igProfile.userId || igProfile.id
 
     // ─── Step 4: Verify user exists and check plan limits ─
     const user = await prisma.user.findUnique({
@@ -208,12 +204,16 @@ export async function GET(request: NextRequest) {
     })
 
     console.log(
-      `[IG Callback] ✅ Stored IG account @${igUsername} (${igUserId}) for user ${userId} → IG Biz ${igBusinessId}`
+      `[IG Callback] ✅ Stored IG account @${igUsername} (app-scoped: ${igUserId}, global/webhook: ${igBusinessId}) for user ${userId}`
     )
 
     // ─── Step 7: Subscribe to webhooks (comments + messages) ─
+    // Use igBusinessId (global user_id) as the path param — this is the ID
+    // Meta sends as entry.id in webhooks. Using the app-scoped igUserId here
+    // causes the subscription to be ignored or mapped to the wrong ID.
     try {
-      const subscribed = await subscribeToWebhooks(igUserId, igAccessToken)
+      const subscribeAsId = igBusinessId || igUserId
+      const subscribed = await subscribeToWebhooks(subscribeAsId, igAccessToken)
       if (subscribed) {
         await prisma.instagramAccount.update({
           where: { id: igAccount.id },

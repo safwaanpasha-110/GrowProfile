@@ -91,11 +91,50 @@ export async function POST(request: NextRequest) {
           ? 'messages'
           : 'messaging_reactions'
 
-      // Try to find the IG account in our system
-      const igAccount = await prisma.instagramAccount.findUnique({
+      // Try to find the IG account in our system.
+      // entry.id from Meta webhooks may be a global IG User ID while we store the
+      // app-scoped user ID from graph.instagram.com/me. Try multiple strategies.
+      let igAccount = await prisma.instagramAccount.findUnique({
         where: { igUserId: event.igUserId },
         select: { id: true, userId: true },
       })
+
+      // Fallback 1: match by igBusinessId (may hold the global IG User ID)
+      if (!igAccount) {
+        igAccount = await prisma.instagramAccount.findFirst({
+          where: { igBusinessId: event.igUserId, isActive: true },
+          select: { id: true, userId: true },
+        })
+        if (igAccount) {
+          console.log(`[Webhook] Matched account via igBusinessId for entry.id=${event.igUserId}`)
+        }
+      }
+
+      // Fallback 2: for comment events, match via campaign that owns the media.
+      // This handles the case where the app-scoped ID stored differs from the
+      // global webhook entry.id but the media ID is unambiguous.
+      if (!igAccount && event.type === 'comment') {
+        const campaignMatch = await prisma.campaign.findFirst({
+          where: {
+            status: 'ACTIVE',
+            media: { some: { igMediaId: event.mediaId } },
+          },
+          select: { igAccount: { select: { id: true, userId: true, igUserId: true } } },
+        })
+        if (campaignMatch?.igAccount) {
+          igAccount = campaignMatch.igAccount
+          console.warn(
+            `[Webhook] entry.id=${event.igUserId} not in DB — matched via media ${event.mediaId} ` +
+            `→ account igUserId=${campaignMatch.igAccount.igUserId}. ` +
+            `Updating igBusinessId to self-heal future lookups.`
+          )
+          // Self-heal: store the global webhook ID so future lookups are instant
+          await prisma.instagramAccount.update({
+            where: { id: campaignMatch.igAccount.id },
+            data: { igBusinessId: event.igUserId },
+          })
+        }
+      }
 
       // Store the raw event in the database
       const webhookEvent = await prisma.webhookEvent.create({
