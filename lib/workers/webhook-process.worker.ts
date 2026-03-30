@@ -16,7 +16,9 @@ import { PrismaClient } from '../../lib/generated/prisma/client.js'
 import { PrismaPg } from '@prisma/adapter-pg'
 import pg from 'pg'
 import IORedis from 'ioredis'
-import type { ParsedWebhookEvent, WebhookCommentEvent, WebhookMessageEvent } from '../webhook-utils'
+import type { ParsedWebhookEvent, WebhookCommentEvent, WebhookMessageEvent, WebhookPostbackEvent } from '../webhook-utils'
+import { sendInteractiveMessage } from '../instagram-api'
+import { decryptToken } from '../encryption'
 
 const { Pool } = pg
 
@@ -64,7 +66,7 @@ async function processComment(job: Job<WebhookJobData>) {
 
   const igAccount = await prisma.instagramAccount.findUnique({
     where: { id: igAccountId },
-    select: { igUserId: true, igBusinessId: true },
+    select: { igUserId: true, igBusinessId: true, igUsername: true },
   })
 
   if (!igAccount) {
@@ -91,6 +93,9 @@ async function processComment(job: Job<WebhookJobData>) {
     },
   })
 
+  // type assertion for anyCommentTrigger (will be available after migration)
+  type CampaignWithAnyTrigger = (typeof campaigns)[number] & { anyCommentTrigger?: boolean }
+
   if (campaigns.length === 0) {
     console.log(`[WebhookWorker] No active campaigns for IG account ${igAccountId}`)
     await markEventProcessed(webhookEventId, 'No matching campaigns')
@@ -106,9 +111,12 @@ async function processComment(job: Job<WebhookJobData>) {
 
     if (!isTargetMedia) continue
 
-    // Check keyword match
+    // Check keyword match — anyCommentTrigger bypasses all keyword logic
+    const campaignExt = campaign as CampaignWithAnyTrigger
     const keywords = campaign.triggerKeywords.map(k => k.toLowerCase())
-    const hasMatch = keywords.length === 0 || // Empty keywords = match all
+    const hasMatch =
+      campaignExt.anyCommentTrigger ||     // explicit any-comment toggle
+      keywords.length === 0 ||             // legacy: empty keywords = all comments
       keywords.some(keyword => commentText.includes(keyword))
 
     if (!hasMatch) continue
@@ -166,7 +174,7 @@ async function processComment(job: Job<WebhookJobData>) {
     })
 
     // Parse DM messages from campaign config
-    const dmMessages = campaign.dmMessages as Array<{ text: string; delayMinutes?: number }>
+    const dmMessages = campaign.dmMessages as Array<{ text: string; buttonLabel?: string; buttonUrl?: string; delayMinutes?: number }>
     if (!dmMessages || dmMessages.length === 0) {
       console.log(`[WebhookWorker] Campaign ${campaign.id} has no DM messages configured`)
       await prisma.interaction.update({
@@ -175,6 +183,8 @@ async function processComment(job: Job<WebhookJobData>) {
       })
       continue
     }
+
+    const firstDm = dmMessages[0]
 
     // Enqueue first DM
     await dmSenderQueue.add(
@@ -186,12 +196,17 @@ async function processComment(job: Job<WebhookJobData>) {
         userId,
         recipientId: commentEvent.from.id,
         recipientUsername: commentEvent.from.username || undefined,
-        messageText: dmMessages[0].text,
+        messageText: firstDm.text,
         messageIndex: 0,
         totalMessages: dmMessages.length,
         requireFollow: campaign.requireFollow,
         commentId: commentEvent.commentId,
         replyMessage: campaign.replyMessage,
+        // Feature: gated vs direct DM flow
+        dmStep: campaign.requireFollow ? 'gated' : 'direct',
+        igAccountUsername: igAccount.igUsername,
+        finalButtonLabel: firstDm.buttonLabel || 'Click me',
+        finalButtonUrl: firstDm.buttonUrl || null,
       },
       {
         // Add a small delay to avoid immediate DM after comment (looks more natural)
@@ -220,6 +235,150 @@ async function processComment(job: Job<WebhookJobData>) {
 
     console.log(`[WebhookWorker] Queued DM for interaction ${interaction.id}`)
   }
+
+  await markEventProcessed(webhookEventId)
+}
+
+// ─── Process postback events (button taps) ───────────────
+
+async function processPostback(job: Job<WebhookJobData>) {
+  const { webhookEventId, igAccountId, userId, event } = job.data
+  const postbackEvent = event as WebhookPostbackEvent
+
+  const payloadStr = postbackEvent.payload || ''
+  console.log(`[WebhookWorker] Postback from ${postbackEvent.senderId}: "${payloadStr}"`)
+
+  // Only handle our own CHECK_FOLLOW payloads
+  if (!payloadStr.startsWith('CHECK_FOLLOW:')) {
+    await markEventProcessed(webhookEventId, `Unhandled postback: ${payloadStr}`)
+    return
+  }
+
+  // Payload format: CHECK_FOLLOW:{campaignId}:{interactionId}
+  const parts = payloadStr.split(':')
+  const campaignId = parts[1]
+  const interactionId = parts[2]
+
+  if (!campaignId || !interactionId) {
+    await markEventFailed(webhookEventId, `Malformed CHECK_FOLLOW payload: ${payloadStr}`)
+    return
+  }
+
+  // Load interaction state
+  const interaction = await prisma.interaction.findUnique({
+    where: { id: interactionId },
+    select: {
+      id: true,
+      igAccountId: true,
+      igScopedUserId: true,
+      igUsername: true,
+      status: true,
+      metadata: true,
+      campaignId: true,
+    },
+  })
+
+  if (!interaction) {
+    await markEventFailed(webhookEventId, `Interaction ${interactionId} not found`)
+    return
+  }
+
+  // Idempotency: if link already sent, skip
+  const meta = (interaction.metadata as Record<string, unknown>) || {}
+  if (meta.linkSent) {
+    console.log(`[WebhookWorker] Link already sent for interaction ${interactionId} — skipping`)
+    await markEventProcessed(webhookEventId, 'Link already sent')
+    return
+  }
+
+  // Load campaign and account details
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+  })
+
+  if (!campaign) {
+    await markEventFailed(webhookEventId, `Campaign ${campaignId} not found`)
+    return
+  }
+
+  const account = await prisma.instagramAccount.findUnique({
+    where: { id: igAccountId },
+    select: {
+      igUserId: true,
+      igUsername: true,
+      accessTokenEncrypted: true,
+      accessTokenIv: true,
+      accessTokenTag: true,
+      tokenExpiresAt: true,
+      isActive: true,
+    },
+  })
+
+  if (!account || !account.isActive) {
+    await markEventFailed(webhookEventId, `IG account ${igAccountId} not found or inactive`)
+    return
+  }
+
+  // Decrypt token
+  const igUserToken = decryptToken({
+    accessTokenEncrypted: account.accessTokenEncrypted,
+    accessTokenIv: account.accessTokenIv,
+    accessTokenTag: account.accessTokenTag,
+  })
+
+  if (!igUserToken) {
+    await markEventFailed(webhookEventId, `IG account ${igAccountId} has no token — reconnect required`)
+    return
+  }
+
+  // Track how many times user has clicked "I'm following"
+  const attempts = typeof meta.followCheckAttempts === 'number' ? meta.followCheckAttempts + 1 : 1
+
+  // NOTE: Instagram's API does NOT support checking follow status by IGSID.
+  // The /followers?user_id= filter requires a global IG user ID, not a messaging IGSID.
+  // Attempting the API call always returns empty (not following), causing an infinite loop.
+  // Solution: trust the user when they tap "I'm following ✅" — send the final DM.
+  console.log(`[WebhookWorker] "I'm following" button click #${attempts} from ${postbackEvent.senderId} — sending final DM`)
+
+  // Update interaction metadata
+  await prisma.interaction.update({
+    where: { id: interactionId },
+    data: {
+      isFollowing: true,
+      metadata: { ...meta, followCheckAttempts: attempts, lastFollowCheckAt: new Date().toISOString() } as any,
+    },
+  })
+
+  // Send the final DM with the campaign link
+  const dmMessages = campaign.dmMessages as Array<{ text: string; buttonLabel?: string; buttonUrl?: string }>
+  const firstDm = dmMessages?.[0] || { text: 'Here is the link!', buttonLabel: 'Click me', buttonUrl: '' }
+
+  await dmSenderQueue.add(
+    `dm-final-${interactionId}`,
+    {
+      interactionId,
+      campaignId,
+      igAccountId,
+      userId,
+      recipientId: postbackEvent.senderId,
+      recipientUsername: interaction.igUsername || undefined,
+      messageText: firstDm.text,
+      messageIndex: 0,
+      totalMessages: 1,
+      requireFollow: false,
+      dmStep: 'final',
+      igAccountUsername: account.igUsername,
+      finalButtonLabel: firstDm.buttonLabel || 'Click me',
+      finalButtonUrl: firstDm.buttonUrl || null,
+    },
+    {
+      // Dedup: only one final DM per interaction
+      jobId: `dm-final-${interactionId}`,
+      delay: 1000,
+    }
+  )
+
+  console.log(`[WebhookWorker] Queued final DM for interaction ${interactionId}`)
 
   await markEventProcessed(webhookEventId)
 }
@@ -390,6 +549,9 @@ const worker = new Worker<WebhookJobData>(
           break
         case 'message':
           await processMessage(job)
+          break
+        case 'postback':
+          await processPostback(job)
           break
         case 'message_reaction':
           // Just mark as processed — reactions are informational

@@ -61,10 +61,20 @@ export interface WebhookMessageReactionEvent {
   timestamp: number
 }
 
+export interface WebhookPostbackEvent {
+  type: 'postback'
+  igUserId: string
+  senderId: string
+  /** Raw postback payload string set when the button was created */
+  payload: string
+  timestamp: number
+}
+
 export type ParsedWebhookEvent =
   | WebhookCommentEvent
   | WebhookMessageEvent
   | WebhookMessageReactionEvent
+  | WebhookPostbackEvent
 
 // ─── Parse Instagram webhook payload ──────────────────────
 
@@ -146,6 +156,18 @@ export function parseWebhookPayload(body: Record<string, unknown>): ParsedWebhoo
             senderId: sender?.id || '',
             reaction: String(reaction.reaction || ''),
             messageId: String(reaction.mid || ''),
+            timestamp,
+          })
+        }
+
+        // Postback (button tap)
+        if (msg.postback) {
+          const postback = msg.postback as Record<string, unknown>
+          events.push({
+            type: 'postback',
+            igUserId,
+            senderId: sender?.id || '',
+            payload: String(postback.payload || ''),
             timestamp,
           })
         }

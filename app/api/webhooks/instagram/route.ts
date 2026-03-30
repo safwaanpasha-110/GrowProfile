@@ -89,7 +89,9 @@ export async function POST(request: NextRequest) {
         ? 'comments'
         : event.type === 'message'
           ? 'messages'
-          : 'messaging_reactions'
+          : event.type === 'postback'
+            ? 'postback'
+            : 'messaging_reactions'
 
       // Try to find the IG account in our system.
       // entry.id from Meta webhooks may be a global IG User ID while we store the
@@ -158,12 +160,14 @@ export async function POST(request: NextRequest) {
             event,
           },
           {
-            // Dedup by comment/message ID to avoid double-processing
+            // Dedup by comment/message/postback ID to avoid double-processing
             jobId: event.type === 'comment'
               ? `comment-${event.commentId}`
               : event.type === 'message'
                 ? `msg-${event.messageId}`
-                : `reaction-${event.messageId}-${event.senderId}`,
+                : event.type === 'postback'
+                  ? `postback-${event.senderId}-${(event as import('@/lib/webhook-utils').WebhookPostbackEvent).payload}-${event.timestamp}`
+                  : `reaction-${event.messageId}-${event.senderId}`,
           }
         )
       } else {

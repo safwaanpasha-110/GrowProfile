@@ -149,38 +149,112 @@ export async function sendPrivateReply(
 // ─── Check if user follows the account ─────────────────────
 
 /**
- * Check if a user with the given IGSID follows the business account.
- * Uses: GET /{ig-user-id}?fields=follower_count (limited)
+ * Check whether a given IGSID follows the business account.
  *
- * Note: The IG API doesn't directly expose "does user X follow me".
- * We use the conversation API or check during webhook processing.
- * For follow-gating, we rely on the `messaging_referral` webhook approach.
+ * Instagram does not expose a direct per-user "is_following" endpoint.
+ * We attempt the `GET /{ig-user-id}/followers?user_id={igsid}` shorthand
+ * (works on many accounts with instagram_manage_insights permission).
+ * If the API is unavailable we fall back to `false` so the follow-gate
+ * loop continues until Instagram eventually honours the request.
  *
- * This is a placeholder — the actual implementation depends on
- * available permissions and API endpoints.
+ * @param igUserId    - App-scoped IG user ID of the business account
+ * @param targetIgsid - IGSID of the person we want to check
+ * @param accessToken - IG User Token with instagram_manage_insights scope
  */
 export async function checkFollowStatus(
   igUserId: string,
-  targetUserId: string,
+  targetIgsid: string,
   accessToken: string
 ): Promise<boolean> {
-  // Instagram doesn't have a direct "is_following" endpoint for IGSID.
-  // The recommended approach is to use the Follower/Following edges
-  // on the IG User node, but these require specific permissions.
-  //
-  // For now, we'll use the conversations endpoint to check
-  // if the user has an existing conversation (indicates engagement).
-  // A more robust approach would use the webhook's follow event.
-
   try {
-    const url = `${IG_API_BASE}/${igUserId}/conversations?user_id=${targetUserId}&fields=id&access_token=${accessToken}`
+    // Attempt the user_id filter shorthand — returns the user in `data` if they follow
+    const url =
+      `${IG_MESSAGING_BASE}/${igUserId}/followers` +
+      `?user_id=${encodeURIComponent(targetIgsid)}&fields=id&access_token=${encodeURIComponent(accessToken)}`
+
     const res = await fetch(url)
-    if (!res.ok) return false
-    const data = await res.json()
-    return data.data && data.data.length > 0
+    if (res.ok) {
+      const data = await res.json()
+      if (Array.isArray(data.data) && data.data.length > 0) return true
+      // API responded but user not in result → not following
+      return false
+    }
   } catch {
-    return false
+    // Network or parse error — treat as unknown
   }
+  // Default: cannot confirm, keep gating
+  return false
+}
+
+// ─── Send interactive button message ────────────────────────
+
+export interface InteractiveButton {
+  type: 'web_url' | 'postback'
+  title: string
+  /** Required when type === 'web_url' */
+  url?: string
+  /** Required when type === 'postback' */
+  payload?: string
+}
+
+/**
+ * Send a button-template interactive message via the Instagram Messaging API.
+ *
+ * Supports:
+ *  - web_url buttons  → open a URL
+ *  - postback buttons → fire a postback event back to the webhook when tapped
+ *
+ * @param igUserId   - The business account's IG user ID (for API path)
+ * @param recipient  - Either `{ id: igsid }` or `{ comment_id: commentId }`
+ * @param text       - The message body shown above the buttons (max 640 chars)
+ * @param buttons    - 1–3 button configs
+ * @param accessToken
+ */
+export async function sendInteractiveMessage(
+  igUserId: string,
+  recipient: { id?: string; comment_id?: string },
+  text: string,
+  buttons: InteractiveButton[],
+  accessToken: string
+): Promise<IgSendMessageResult> {
+  if (buttons.length === 0 || buttons.length > 3) {
+    throw new Error('sendInteractiveMessage: buttons array must have 1–3 items')
+  }
+
+  const url = `${IG_MESSAGING_BASE}/${igUserId}/messages`
+
+  const body: Record<string, unknown> = {
+    recipient,
+    message: {
+      attachment: {
+        type: 'template',
+        payload: {
+          template_type: 'button',
+          text,
+          buttons: buttons.map((btn) => {
+            if (btn.type === 'web_url') {
+              return { type: 'web_url', url: btn.url!, title: btn.title }
+            }
+            return { type: 'postback', title: btn.title, payload: btn.payload! }
+          }),
+        },
+      },
+    },
+    access_token: accessToken,
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`IG interactive message failed (${res.status}): ${err}`)
+  }
+
+  return res.json()
 }
 
 // ─── Fetch comment details ─────────────────────────────────

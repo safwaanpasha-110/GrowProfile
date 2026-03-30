@@ -301,7 +301,8 @@ model Campaign {
   status  CampaignStatus @default(DRAFT)
 
   // Trigger config
-  triggerKeywords String[] @map("trigger_keywords") // Array of keywords to match
+  triggerKeywords    String[] @map("trigger_keywords") // Array of keywords to match
+  anyCommentTrigger  Boolean  @default(false) @map("any_comment_trigger") // Trigger on every comment (bypasses keywords)
 
   // Response config
   replyMessage        String?  @map("reply_message") // Public comment reply text

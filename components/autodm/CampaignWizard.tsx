@@ -81,6 +81,7 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
   const [buttonLabel, setButtonLabel] = useState('')
   const [buttonUrl, setButtonUrl] = useState('')
   const [campaignStatus, setCampaignStatus] = useState<'DRAFT' | 'ACTIVE'>('ACTIVE')
+  const [anyCommentTrigger, setAnyCommentTrigger] = useState(false)
 
   // Media
   const [igMedia, setIgMedia] = useState<IgMedia[]>([])
@@ -122,6 +123,7 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
       setDmType(firstDm?.buttonLabel ? 'text_button' : 'text')
       setButtonLabel(firstDm?.buttonLabel || '')
       setButtonUrl(firstDm?.buttonUrl || '')
+      setAnyCommentTrigger((editingCampaign as any).anyCommentTrigger ?? false)
     }
     fetchMedia()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -179,7 +181,7 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
   const canProceed = () => {
     switch (step) {
       case 1: return !!campaignName.trim()
-      case 2: return keywordTags.length > 0
+      case 2: return anyCommentTrigger || keywordTags.length > 0
       case 3: return !!dmMessage.trim() && (dmType === 'text' || (!!buttonLabel.trim() && !!buttonUrl.trim()))
       default: return true
     }
@@ -201,6 +203,7 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
         name: campaignName,
         type: campaignType,
         triggerKeywords: keywordTags,
+        anyCommentTrigger,
         replyMessage: campaignType === 'COMMENT_DM' ? (replyMessage || null) : null,
         dmMessages: [dmEntry],
         requireFollow,
@@ -453,7 +456,46 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
          ══════════════════════════════════════════════════════ */}
       {step === 2 && (
         <div className="space-y-6">
+          {/* Trigger mode (COMMENT_DM only) */}
+          {campaignType === 'COMMENT_DM' && (
+            <div className="p-6 rounded-2xl bg-card border border-border">
+              <h2 className="text-lg font-bold text-foreground mb-1">Trigger Mode</h2>
+              <p className="text-sm text-muted-foreground mb-4">Choose when to trigger the AutoDM</p>
+              <div className="space-y-3">
+                <button
+                  onClick={() => setAnyCommentTrigger(false)}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-start gap-3 ${
+                    !anyCommentTrigger ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${!anyCommentTrigger ? 'border-primary' : 'border-muted-foreground/40'}`}>
+                    {!anyCommentTrigger && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-foreground">Keyword Match</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Only trigger when the comment contains specific keywords</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setAnyCommentTrigger(true)}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all flex items-start gap-3 ${
+                    anyCommentTrigger ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${anyCommentTrigger ? 'border-primary' : 'border-muted-foreground/40'}`}>
+                    {anyCommentTrigger && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-foreground">Any Comment</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Trigger for <strong>every</strong> comment — no keyword required</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Keyword Tags */}
+          {!anyCommentTrigger && (
           <div className="p-6 rounded-2xl bg-card border border-border">
             <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
               <Hash className="w-4 h-4 text-primary" />
@@ -485,8 +527,7 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
             </div>
             <p className="text-xs text-muted-foreground mt-2">Press Enter or comma to add · Backspace to remove last</p>
           </div>
-
-          {/* Public Reply (COMMENT_DM only) */}
+          )} {/* end !anyCommentTrigger */}
           {campaignType === 'COMMENT_DM' && (
             <div className="p-6 rounded-2xl bg-card border border-border">
               <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-1">
@@ -765,13 +806,20 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
             {/* Keywords */}
             <div className="p-5 rounded-2xl bg-card border border-border">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                And <span className="text-foreground font-bold">includes</span> these keywords
+                {anyCommentTrigger
+                  ? <span>Trigger on <span className="text-foreground font-bold">any</span> comment</span>
+                  : <span>And <span className="text-foreground font-bold">includes</span> these keywords</span>
+                }
               </p>
-              <div className="flex flex-wrap gap-2">
-                {keywordTags.map(kw => (
-                  <Badge key={kw} className="bg-primary/10 text-primary px-3 py-1.5 text-sm">#{kw}</Badge>
-                ))}
-              </div>
+              {anyCommentTrigger ? (
+                <Badge className="bg-primary/10 text-primary px-3 py-1.5 text-sm">All comments trigger this campaign</Badge>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {keywordTags.map(kw => (
+                    <Badge key={kw} className="bg-primary/10 text-primary px-3 py-1.5 text-sm">#{kw}</Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Connector */}
@@ -839,7 +887,9 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
               </div>
               <div>
                 <p className="text-muted-foreground mb-0.5">Keywords</p>
-                <p className="font-medium text-foreground">{keywordTags.join(', ')}</p>
+                <p className="font-medium text-foreground">
+                  {anyCommentTrigger ? 'Any comment' : keywordTags.join(', ')}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground mb-0.5">Require Follow</p>

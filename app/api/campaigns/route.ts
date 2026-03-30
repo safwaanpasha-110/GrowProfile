@@ -46,6 +46,7 @@ export const POST = withAuth(async (request: NextRequest, user: AuthUser) => {
     name,
     type = 'COMMENT_DM',
     triggerKeywords = [],
+    anyCommentTrigger = false,
     replyMessage,
     dmMessages = [],
     requireFollow = false,
@@ -56,9 +57,16 @@ export const POST = withAuth(async (request: NextRequest, user: AuthUser) => {
     status = 'DRAFT',
   } = body
 
-  if (!igAccountId || !name || triggerKeywords.length === 0) {
+  if (!igAccountId || !name) {
     return NextResponse.json(
-      { error: 'igAccountId, name, and at least one triggerKeyword are required' },
+      { error: 'igAccountId and name are required' },
+      { status: 400 }
+    )
+  }
+
+  if (!anyCommentTrigger && triggerKeywords.length === 0) {
+    return NextResponse.json(
+      { error: 'At least one triggerKeyword is required unless anyCommentTrigger is enabled' },
       { status: 400 }
     )
   }
@@ -87,6 +95,7 @@ export const POST = withAuth(async (request: NextRequest, user: AuthUser) => {
       type,
       status,
       triggerKeywords,
+      anyCommentTrigger,
       replyMessage: replyMessage || null,
       dmMessages,
       requireFollow,

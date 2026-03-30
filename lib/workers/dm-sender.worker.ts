@@ -22,6 +22,7 @@ import {
   sendInstagramDM,
   sendPrivateReply,
   replyToComment,
+  sendInteractiveMessage,
   rateLimitKey,
   RATE_LIMITS,
 } from '../instagram-api'
@@ -76,6 +77,11 @@ interface DmJobData {
   requireFollow: boolean
   commentId?: string       // For private reply fallback
   replyMessage?: string    // Public comment reply text
+  // Follow-gate flow
+  dmStep?: 'gated' | 'final' | 'direct'
+  igAccountUsername?: string  // Business username for "Visit Profile" button
+  finalButtonLabel?: string | null  // Button label for final DM
+  finalButtonUrl?: string | null    // Button URL for final DM
 }
 
 // ─── Rate limit check ─────────────────────────────────────
@@ -221,6 +227,10 @@ const worker = new Worker<DmJobData>(
       requireFollow,
       commentId,
       replyMessage,
+      dmStep,
+      igAccountUsername,
+      finalButtonLabel,
+      finalButtonUrl,
     } = job.data
 
     // Substitute {{name}} with the commenter's username (or a friendly fallback)
@@ -288,9 +298,9 @@ const worker = new Worker<DmJobData>(
 
       const interactionMetadata = await getInteractionMetadata(interactionId)
 
-      // First message: Send public comment reply if configured
+      // First message: Send public comment reply if configured (skip for gated flow)
       // Uses IG User Token at graph.instagram.com/{comment-id}/replies
-      if (messageIndex === 0 && replyMessage && commentId) {
+      if (messageIndex === 0 && replyMessage && commentId && dmStep !== 'final') {
         if (interactionMetadata.publicReplySent) {
           console.log(`[DmSender] Public comment reply already sent for interaction ${interactionId} — skipping`)
         } else {
@@ -308,6 +318,125 @@ const worker = new Worker<DmJobData>(
           }
         }
       }
+
+      // ─── GATED FLOW: Send "almost there" message with buttons ───
+      if (dmStep === 'gated') {
+        try {
+          const profileUrl = `https://www.instagram.com/${igAccountUsername || 'instagram'}/`
+          const meta = await getInteractionMetadata(interactionId)
+          const attempts = typeof meta.followCheckAttempts === 'number' ? meta.followCheckAttempts : 0
+          // Build a unique payload so each button tap is distinguishable
+          const postbackPayload = `CHECK_FOLLOW:${campaignId}:${interactionId}`
+
+          const recipient = commentId && attempts === 0
+            ? { comment_id: commentId }
+            : { id: recipientId }
+
+          const result = await sendInteractiveMessage(
+            igUserId,
+            recipient,
+            'Almost there! Please visit my profile and tap follow to continue 😁',
+            [
+              { type: 'web_url', title: 'Visit Profile', url: profileUrl },
+              { type: 'postback', title: "I'm following ✅", payload: postbackPayload },
+            ],
+            igUserToken
+          )
+
+          console.log(`[DmSender] Sent gated DM (msg_id: ${result.message_id}) to ${recipientId}`)
+
+          await prisma.interaction.update({
+            where: { id: interactionId },
+            data: {
+              status: 'FOLLOW_PENDING',
+              dmMessageId: result.message_id,
+            },
+          })
+
+          await incrementRateLimit(igAccountId)
+        } catch (err) {
+          // If interactive template fails (e.g. old API version), fall back to plain text
+          console.warn(`[DmSender] Interactive gated DM failed, falling back to plain text:`, err)
+          try {
+            const profileUrl = `https://www.instagram.com/${igAccountUsername || 'instagram'}/`
+            const plainText =
+              `Almost there! Please visit my profile and tap follow to continue 😁\n\n` +
+              `👉 ${profileUrl}\n\n` +
+              `Once you follow, reply back "following" and I'll send you the link!`
+
+            const result = commentId
+              ? await sendPrivateReply(igUserId, commentId, plainText, igUserToken)
+              : await sendInstagramDM(igUserId, recipientId, plainText, igUserToken)
+
+            await prisma.interaction.update({
+              where: { id: interactionId },
+              data: { status: 'FOLLOW_PENDING', dmMessageId: result.message_id },
+            })
+            await incrementRateLimit(igAccountId)
+          } catch (fallbackErr) {
+            const errMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+            await prisma.interaction.update({ where: { id: interactionId }, data: { status: 'FAILED' } })
+            await mergeInteractionMetadata(interactionId, { error: errMsg, failedAt: new Date().toISOString() })
+            throw fallbackErr
+          }
+        }
+
+        return // Done for gated step
+      }
+
+      // ─── FINAL FLOW: Send link message with "Click me" button ───
+      if (dmStep === 'final') {
+        // Idempotency check — never send the link twice
+        if (interactionMetadata.linkSent) {
+          console.log(`[DmSender] Link already sent for interaction ${interactionId} — skipping`)
+          return
+        }
+
+        try {
+          const linkText = messageText ||
+            'Hey there! Thanks for commenting 🙌\nHere\'s the link I mentioned 👇'
+          const btnLabel = finalButtonLabel || 'Click me'
+          const btnUrl = finalButtonUrl || ''
+
+          let result: import('../instagram-api').IgSendMessageResult
+
+          if (btnUrl) {
+            result = await sendInteractiveMessage(
+              igUserId,
+              { id: recipientId },
+              linkText,
+              [{ type: 'web_url', title: btnLabel, url: btnUrl }],
+              igUserToken
+            )
+          } else {
+            // No URL configured — send plain text
+            result = await sendInstagramDM(igUserId, recipientId, linkText, igUserToken)
+          }
+
+          console.log(`[DmSender] Sent final DM (msg_id: ${result.message_id}) to ${recipientId}`)
+
+          await prisma.interaction.update({
+            where: { id: interactionId },
+            data: { status: 'COMPLETED', dmMessageId: result.message_id, isFollowing: true },
+          })
+          await mergeInteractionMetadata(interactionId, {
+            linkSent: true,
+            linkSentAt: new Date().toISOString(),
+          })
+
+          await incrementRateLimit(igAccountId)
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err)
+          console.error(`[DmSender] Final DM send failed:`, errMsg)
+          await prisma.interaction.update({ where: { id: interactionId }, data: { status: 'FAILED' } })
+          await mergeInteractionMetadata(interactionId, { error: errMsg, failedAt: new Date().toISOString() })
+          throw err
+        }
+
+        return // Done for final step
+      }
+
+      // ─── DIRECT FLOW: existing behavior (no follow-gate) ────────
 
       // Send DM (private reply or direct DM)
       // Uses IG User Token at graph.instagram.com/{ig-user-id}/messages

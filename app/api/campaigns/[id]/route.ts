@@ -75,6 +75,7 @@ export const PATCH = withAuth(async (
     name,
     status,
     triggerKeywords,
+    anyCommentTrigger,
     replyMessage,
     dmMessages,
     requireFollow,
@@ -89,6 +90,7 @@ export const PATCH = withAuth(async (
   if (name !== undefined) updateData.name = name
   if (status !== undefined) updateData.status = status
   if (triggerKeywords !== undefined) updateData.triggerKeywords = triggerKeywords
+  if (anyCommentTrigger !== undefined) updateData.anyCommentTrigger = anyCommentTrigger
   if (replyMessage !== undefined) updateData.replyMessage = replyMessage
   if (dmMessages !== undefined) updateData.dmMessages = dmMessages
   if (requireFollow !== undefined) updateData.requireFollow = requireFollow
