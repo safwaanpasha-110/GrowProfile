@@ -191,7 +191,7 @@ export default function ReferralPage() {
                   <div key={ref.id} className="flex items-center justify-between p-4 bg-secondary/20 rounded-lg border border-border">
                     <div>
                       <p className="font-semibold text-foreground">{ref.name}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(ref.date).toLocaleDateString()}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(ref.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}</p>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className={`text-sm px-3 py-1 rounded-full font-medium ${

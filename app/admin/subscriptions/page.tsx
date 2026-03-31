@@ -242,10 +242,10 @@ export default function SubscriptionsPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4 text-muted-foreground text-xs">
-                        {sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : '—'}
+                        {sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) : '—'}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground text-xs">
-                        {new Date(sub.createdAt).toLocaleDateString()}
+                        {new Date(sub.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-foreground text-xs">
@@ -300,9 +300,9 @@ export default function SubscriptionsPage() {
                   { label: 'Plan', value: selected.plan.displayName },
                   { label: 'Price', value: `$${Number(selected.plan.price)}/mo` },
                   { label: 'Status', value: selected.status },
-                  { label: 'Started', value: new Date(selected.createdAt).toLocaleDateString() },
-                  { label: 'Period End', value: selected.currentPeriodEnd ? new Date(selected.currentPeriodEnd).toLocaleDateString() : '—' },
-                  { label: 'Cancelled', value: selected.cancelledAt ? new Date(selected.cancelledAt).toLocaleDateString() : '—' },
+                  { label: 'Started', value: new Date(selected.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) },
+                  { label: 'Period End', value: selected.currentPeriodEnd ? new Date(selected.currentPeriodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) : '—' },
+                  { label: 'Cancelled', value: selected.cancelledAt ? new Date(selected.cancelledAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) : '—' },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-muted/40 rounded-lg p-2.5">
                     <p className="text-xs text-muted-foreground">{label}</p>

@@ -1,6 +1,7 @@
 'use client'
 
 import { TrendingUp, Users, Send, MessageSquare, Loader2, BarChart3, Clock } from 'lucide-react'
+import { formatDate } from '@/lib/utils'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -156,7 +157,7 @@ export default function AudiencePage() {
                 return (
                   <div key={idx} className="flex items-center gap-3">
                     <span className="text-xs text-muted-foreground w-16 text-right font-mono">
-                      {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {formatDate(day.date)}
                     </span>
                     <div className="flex-1 h-4 bg-muted rounded-full overflow-hidden">
                       <div
@@ -196,7 +197,7 @@ export default function AudiencePage() {
                     <td className="py-3 text-sm text-muted-foreground">{lead.campaignName}</td>
                     <td className="py-3 text-sm text-muted-foreground capitalize">{lead.source}</td>
                     <td className="py-3 text-sm text-muted-foreground">
-                      {new Date(lead.capturedAt).toLocaleDateString()}
+                      {formatDate(lead.capturedAt)}
                     </td>
                   </tr>
                 ))}

@@ -247,8 +247,8 @@ export default function PaymentsPage() {
                         </td>
                         <td className="py-3 px-4 text-muted-foreground text-xs">
                           {pmt.paidAt
-                            ? new Date(pmt.paidAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-                            : new Date(pmt.createdAt).toLocaleDateString()}
+                            ? new Date(pmt.paidAt).toLocaleString('en-IN', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
+                            : new Date(pmt.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                         </td>
                       </tr>
                     )

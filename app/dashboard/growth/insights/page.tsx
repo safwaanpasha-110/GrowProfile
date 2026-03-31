@@ -1,6 +1,7 @@
 'use client'
 
 import { TrendingUp, Calendar, Loader2, MessageSquare, Send, Users, BarChart3 } from 'lucide-react'
+import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -129,7 +130,7 @@ export default function InsightsPage() {
                   title={`${day.date}: ${day.count} interactions`}
                 ></div>
                 <span className="text-[10px] font-medium text-muted-foreground">
-                  {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {formatDate(day.date)}
                 </span>
               </div>
             ))}
@@ -211,7 +212,7 @@ export default function InsightsPage() {
                     <td className="py-3 text-sm text-muted-foreground">{lead.campaignName}</td>
                     <td className="py-3 text-sm text-muted-foreground capitalize">{lead.source}</td>
                     <td className="py-3 text-sm text-muted-foreground">
-                      {new Date(lead.capturedAt).toLocaleDateString()}
+                      {formatDate(lead.capturedAt)}
                     </td>
                   </tr>
                 ))}

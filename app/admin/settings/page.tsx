@@ -173,7 +173,7 @@ export default function SettingsPage() {
                   <p className="text-xs text-slate-400 mt-1">
                     Last updated by {settings[field.key].updatedBy}{' '}
                     {settings[field.key].updatedAt && (
-                      <>on {new Date(settings[field.key].updatedAt!).toLocaleDateString()}</>
+                      <>on {new Date(settings[field.key].updatedAt!).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}</>
                     )}
                   </p>
                 )}

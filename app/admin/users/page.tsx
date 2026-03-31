@@ -401,7 +401,7 @@ export default function UsersPage() {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-muted-foreground text-xs">
-                        {new Date(u.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {new Date(u.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <Button
@@ -613,7 +613,7 @@ export default function UsersPage() {
                     { label: 'User ID', value: selectedUser.id.slice(0, 16) + '...' },
                     { label: 'Plan', value: selectedUser.plan?.displayName || 'None' },
                     { label: 'Sub Status', value: selectedUser.subscriptions?.[0]?.status || 'N/A' },
-                    { label: 'Joined', value: new Date(selectedUser.createdAt).toLocaleDateString() },
+                    { label: 'Joined', value: new Date(selectedUser.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) },
                     { label: 'IG Accounts', value: selectedUser.stats?.instagramAccounts ?? selectedUser._count?.instagramAccounts ?? 0 },
                     { label: 'Campaigns', value: selectedUser.stats?.campaigns ?? selectedUser._count?.campaigns ?? 0 },
                     { label: 'Leads', value: selectedUser._count?.leads ?? 0 },
@@ -699,7 +699,7 @@ export default function UsersPage() {
                       <div key={log.id} className="flex items-start justify-between py-1.5 px-2 text-xs hover:bg-muted/30 rounded">
                         <span className="font-mono text-muted-foreground">{log.action}</span>
                         <span className="text-muted-foreground whitespace-nowrap ml-2">
-                          {new Date(log.createdAt).toLocaleDateString()}
+                          {new Date(log.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}
                         </span>
                       </div>
                     ))}
