@@ -80,6 +80,7 @@ interface DmJobData {
   // Follow-gate flow
   dmStep?: 'gated' | 'final' | 'direct'
   igAccountUsername?: string  // Business username for "Visit Profile" button
+  gatedDmMessage?: string | null  // Custom gated DM text (fallback to default)
   finalButtonLabel?: string | null  // Button label for final DM
   finalButtonUrl?: string | null    // Button URL for final DM
 }
@@ -229,6 +230,7 @@ const worker = new Worker<DmJobData>(
       replyMessage,
       dmStep,
       igAccountUsername,
+      gatedDmMessage,
       finalButtonLabel,
       finalButtonUrl,
     } = job.data
@@ -332,10 +334,12 @@ const worker = new Worker<DmJobData>(
             ? { comment_id: commentId }
             : { id: recipientId }
 
+          const gatedText = gatedDmMessage || 'Almost there! Please visit my profile and tap follow to continue 😁'
+
           const result = await sendInteractiveMessage(
             igUserId,
             recipient,
-            'Almost there! Please visit my profile and tap follow to continue 😁',
+            gatedText,
             [
               { type: 'web_url', title: 'Visit Profile', url: profileUrl },
               { type: 'postback', title: "I'm following ✅", payload: postbackPayload },
@@ -359,8 +363,9 @@ const worker = new Worker<DmJobData>(
           console.warn(`[DmSender] Interactive gated DM failed, falling back to plain text:`, err)
           try {
             const profileUrl = `https://www.instagram.com/${igAccountUsername || 'instagram'}/`
+            const gatedText = gatedDmMessage || 'Almost there! Please visit my profile and tap follow to continue 😁'
             const plainText =
-              `Almost there! Please visit my profile and tap follow to continue 😁\n\n` +
+              `${gatedText}\n\n` +
               `👉 ${profileUrl}\n\n` +
               `Once you follow, reply back "following" and I'll send you the link!`
 

@@ -79,6 +79,7 @@ export const PATCH = withAuth(async (
     replyMessage,
     dmMessages,
     requireFollow,
+    gatedDmMessage,
     followUpEnabled,
     followUpDelayMinutes,
     maxFollowUps,
@@ -94,6 +95,7 @@ export const PATCH = withAuth(async (
   if (replyMessage !== undefined) updateData.replyMessage = replyMessage
   if (dmMessages !== undefined) updateData.dmMessages = dmMessages
   if (requireFollow !== undefined) updateData.requireFollow = requireFollow
+  if (gatedDmMessage !== undefined) updateData.gatedDmMessage = gatedDmMessage
   if (followUpEnabled !== undefined) updateData.followUpEnabled = followUpEnabled
   if (followUpDelayMinutes !== undefined) updateData.followUpDelayMinutes = followUpDelayMinutes
   if (maxFollowUps !== undefined) updateData.maxFollowUps = maxFollowUps

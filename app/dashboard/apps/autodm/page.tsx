@@ -7,7 +7,7 @@ import {
   Instagram, Zap, CheckCircle2, Play, Pause,
   Sparkles, MessageSquare, Send, Plus, Trash2,
   Eye, Loader2, Image as ImageIcon,
-  Mail, MessageCircle
+  Mail, MessageCircle, ListFilter, FileImage
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,7 @@ interface Campaign {
 }
 
 type ViewMode = 'campaigns' | 'create' | 'edit'
+type SectionMode = 'campaigns' | 'single-post'
 
 // ─── Main Component ───────────────────────────────────────
 
@@ -52,6 +53,7 @@ export default function AutoDMPage() {
 
   // State
   const [view, setView] = useState<ViewMode>('campaigns')
+  const [sectionMode, setSectionMode] = useState<SectionMode>('campaigns')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -150,10 +152,15 @@ export default function AutoDMPage() {
   // ─── CAMPAIGNS LIST VIEW ────────────────────────────────
 
   if (view === 'campaigns') {
+    // Filter campaigns based on section mode
+    const visibleCampaigns = sectionMode === 'single-post'
+      ? campaigns.filter(c => c.type === 'COMMENT_DM' && c.media.length === 1)
+      : campaigns
+
     return (
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/25">
               <Zap className="w-6 h-6 text-white" />
@@ -168,8 +175,34 @@ export default function AutoDMPage() {
             className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 gap-2 shadow-lg shadow-primary/20"
           >
             <Plus className="w-4 h-4" />
-            New Campaign
+            {sectionMode === 'single-post' ? 'New Automation' : 'New Campaign'}
           </Button>
+        </div>
+
+        {/* Section Mode Toggle */}
+        <div className="mb-6 flex items-center gap-1 p-1 rounded-xl bg-muted w-fit">
+          <button
+            onClick={() => setSectionMode('campaigns')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              sectionMode === 'campaigns'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ListFilter className="w-4 h-4" />
+            Campaigns
+          </button>
+          <button
+            onClick={() => setSectionMode('single-post')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              sectionMode === 'single-post'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <FileImage className="w-4 h-4" />
+            Single Post Automation
+          </button>
         </div>
 
         {/* Connected Account Banner */}
@@ -203,19 +236,27 @@ export default function AutoDMPage() {
           <div className="flex items-center justify-center py-20">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
           </div>
-        ) : campaigns.length === 0 ? (
+        ) : visibleCampaigns.length === 0 ? (
           /* Empty State */
           <div className="text-center py-16 px-6 rounded-2xl bg-card border border-border">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center mx-auto mb-4">
-              <MessageSquare className="w-8 h-8 text-primary" />
+              {sectionMode === 'single-post' ? (
+                <FileImage className="w-8 h-8 text-primary" />
+              ) : (
+                <MessageSquare className="w-8 h-8 text-primary" />
+              )}
             </div>
-            <h3 className="text-xl font-bold text-foreground mb-2">No campaigns yet</h3>
+            <h3 className="text-xl font-bold text-foreground mb-2">
+              {sectionMode === 'single-post' ? 'No single post automations yet' : 'No campaigns yet'}
+            </h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Create your first AutoDM campaign to automatically respond when users comment keywords on your posts or DM you a keyword.
+              {sectionMode === 'single-post'
+                ? 'Create a Single Post Automation to automatically DM everyone who comments on one specific post.'
+                : 'Create your first AutoDM campaign to automatically respond when users comment keywords on your posts or DM you a keyword.'}
             </p>
             <Button onClick={startCreate} className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 gap-2">
               <Plus className="w-4 h-4" />
-              Create Your First Campaign
+              {sectionMode === 'single-post' ? 'Create Automation' : 'Create Your First Campaign'}
             </Button>
 
             {/* How it works */}
@@ -258,7 +299,7 @@ export default function AutoDMPage() {
         ) : (
           /* Campaign Cards */
           <div className="space-y-4">
-            {campaigns.map((campaign) => (
+            {visibleCampaigns.map((campaign) => (
               <div
                 key={campaign.id}
                 className="group p-6 rounded-2xl bg-card border border-border hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300"
@@ -415,6 +456,7 @@ export default function AutoDMPage() {
     <CampaignWizard
       igAccount={igAccount}
       editingCampaign={editingCampaign}
+      singlePostMode={sectionMode === 'single-post' && view === 'create'}
       onSuccess={() => {
         setEditingCampaign(null)
         setView('campaigns')

@@ -308,6 +308,7 @@ model Campaign {
   replyMessage        String?  @map("reply_message") // Public comment reply text
   dmMessages          Json     @default("[]") @map("dm_messages") // JSON array of DM message sequence
   requireFollow       Boolean  @default(false) @map("require_follow") // Follow-gate
+  gatedDmMessage      String?  @map("gated_dm_message") // Custom text for the follow-gate DM
   followUpEnabled     Boolean  @default(false) @map("follow_up_enabled")
   followUpDelayMinutes Int     @default(60) @map("follow_up_delay_minutes")
   maxFollowUps        Int      @default(2) @map("max_follow_ups")

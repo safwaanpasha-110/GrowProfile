@@ -52,6 +52,7 @@ interface Campaign {
 interface WizardProps {
   igAccount: { id: string; igUsername: string; igUserId: string }
   editingCampaign: Campaign | null
+  singlePostMode?: boolean
   onSuccess: () => void
   onCancel: () => void
 }
@@ -62,7 +63,7 @@ const STEPS = ['Setup', 'Triggers', 'Message', 'Review'] as const
 
 // ─── Component ────────────────────────────────────────────
 
-export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel }: WizardProps) {
+export function CampaignWizard({ igAccount, editingCampaign, singlePostMode = false, onSuccess, onCancel }: WizardProps) {
   const { authFetch } = useAuth()
 
   // Wizard step
@@ -73,9 +74,10 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
   const [campaignName, setCampaignName] = useState('')
   const [keywordTags, setKeywordTags] = useState<string[]>([])
   const [currentKeyword, setCurrentKeyword] = useState('')
-  const [dmMessage, setDmMessage] = useState('')
-  const [replyMessage, setReplyMessage] = useState('')
+  const [dmMessage, setDmMessage] = useState('Hey {{name}}! 👋 Thanks for commenting! Here\'s what you asked for below 👇')
+  const [replyMessage, setReplyMessage] = useState('Sent you a DM! Check your inbox 📩')
   const [requireFollow, setRequireFollow] = useState(false)
+  const [gatedDmMessage, setGatedDmMessage] = useState('Almost there! Please visit my profile and tap follow to continue 😁')
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set())
   const [dmType, setDmType] = useState<'text' | 'text_button'>('text')
   const [buttonLabel, setButtonLabel] = useState('')
@@ -114,9 +116,10 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
       setCampaignType((editingCampaign.type as 'COMMENT_DM' | 'DM_KEYWORD') || 'COMMENT_DM')
       setCampaignName(editingCampaign.name)
       setKeywordTags(editingCampaign.triggerKeywords)
-      setDmMessage(editingCampaign.dmMessages?.[0]?.text || '')
-      setReplyMessage(editingCampaign.replyMessage || '')
+      setDmMessage(editingCampaign.dmMessages?.[0]?.text || 'Hey {{name}}! 👋 Thanks for commenting! Here\'s what you asked for below 👇')
+      setReplyMessage(editingCampaign.replyMessage || 'Sent you a DM! Check your inbox 📩')
       setRequireFollow(editingCampaign.requireFollow)
+      setGatedDmMessage((editingCampaign as any).gatedDmMessage || 'Almost there! Please visit my profile and tap follow to continue 😁')
       setCampaignStatus(editingCampaign.status as 'DRAFT' | 'ACTIVE')
       setSelectedMediaIds(new Set(editingCampaign.media.map(m => m.igMediaId)))
       const firstDm = editingCampaign.dmMessages?.[0] as any
@@ -170,8 +173,12 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
   const toggleMediaSelection = (mediaId: string) => {
     setSelectedMediaIds(prev => {
       const next = new Set(prev)
-      if (next.has(mediaId)) next.delete(mediaId)
-      else next.add(mediaId)
+      if (next.has(mediaId)) {
+        next.delete(mediaId)
+      } else {
+        if (singlePostMode) next.clear() // single-post mode: only 1 post at a time
+        next.add(mediaId)
+      }
       return next
     })
   }
@@ -180,7 +187,7 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
 
   const canProceed = () => {
     switch (step) {
-      case 1: return !!campaignName.trim()
+      case 1: return !!campaignName.trim() && (!singlePostMode || selectedMediaIds.size === 1)
       case 2: return anyCommentTrigger || keywordTags.length > 0
       case 3: return !!dmMessage.trim() && (dmType === 'text' || (!!buttonLabel.trim() && !!buttonUrl.trim()))
       default: return true
@@ -207,6 +214,7 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
         replyMessage: campaignType === 'COMMENT_DM' ? (replyMessage || null) : null,
         dmMessages: [dmEntry],
         requireFollow,
+        gatedDmMessage: requireFollow ? (gatedDmMessage || null) : null,
         status: asDraft ? 'DRAFT' : 'ACTIVE',
         mediaIds: campaignType === 'COMMENT_DM'
           ? Array.from(selectedMediaIds).map(igMediaId => {
@@ -255,13 +263,19 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
       <div className="mb-6">
         <Button variant="ghost" className="gap-2 mb-4 -ml-2" onClick={onCancel}>
           <ArrowLeft className="w-4 h-4" />
-          Back to Campaigns
+          {singlePostMode ? 'Back to Automations' : 'Back to Campaigns'}
         </Button>
         <h1 className="text-3xl font-bold text-foreground">
-          {editingCampaign ? 'Edit Campaign' : 'Create Campaign'}
+          {editingCampaign
+            ? (singlePostMode ? 'Edit Automation' : 'Edit Campaign')
+            : (singlePostMode ? 'Create Single Post Automation' : 'Create Campaign')}
         </h1>
         <p className="text-muted-foreground mt-1">
-          {editingCampaign ? `Editing "${editingCampaign.name}"` : 'Set up your AutoDM automation in 4 simple steps'}
+          {editingCampaign
+            ? `Editing "${editingCampaign.name}"`
+            : singlePostMode
+              ? 'Set up an AutoDM for one specific post in 4 simple steps'
+              : 'Set up your AutoDM automation in 4 simple steps'}
         </p>
       </div>
 
@@ -328,7 +342,8 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
             />
           </div>
 
-          {/* Campaign Type */}
+          {/* Campaign Type — hidden in single-post mode (always COMMENT_DM) */}
+          {!singlePostMode && (
           <div className="p-6 rounded-2xl bg-card border border-border">
             <h2 className="text-lg font-bold text-foreground mb-1">When someone...</h2>
             <p className="text-sm text-muted-foreground mb-4">Choose how the automation is triggered</p>
@@ -375,14 +390,21 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
               </button>
             </div>
           </div>
+          )} {/* end !singlePostMode campaign type picker */}
 
           {/* Post Selector (COMMENT_DM only) */}
           {campaignType === 'COMMENT_DM' && (
             <div className="p-6 rounded-2xl bg-card border border-border">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-bold text-foreground mb-1">Select Posts / Reels</h2>
-                  <p className="text-sm text-muted-foreground">Choose which content triggers the AutoDM (leave empty = all posts)</p>
+                  <h2 className="text-lg font-bold text-foreground mb-1">
+                    {singlePostMode ? 'Select Post / Reel' : 'Select Posts / Reels'}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {singlePostMode
+                      ? 'Choose the one post this automation will watch — required'
+                      : 'Choose which content triggers the AutoDM (leave empty = all posts)'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {selectedMediaIds.size > 0 && (
@@ -445,6 +467,16 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
                     )
                   })}
                 </div>
+              )}
+              {singlePostMode && selectedMediaIds.size === 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 flex items-center gap-1.5">
+                  ⚠️ You must select exactly 1 post to continue
+                </p>
+              )}
+              {singlePostMode && selectedMediaIds.size === 1 && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-3 flex items-center gap-1.5">
+                  ✅ 1 post selected — ready to continue
+                </p>
               )}
             </div>
           )}
@@ -585,6 +617,23 @@ export function CampaignWizard({ igAccount, editingCampaign, onSuccess, onCancel
                   <div className={`w-5 h-5 bg-white rounded-full shadow-md transition-transform ${requireFollow ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
                 </button>
               </div>
+
+              {/* Gated DM message — shown when requireFollow is on */}
+              {requireFollow && (
+                <div className="px-4 pb-4 pt-3 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
+                  <label className="text-xs font-semibold text-foreground block">
+                    Follow-Gate Message
+                  </label>
+                  <p className="text-xs text-muted-foreground">This message is sent first, asking the user to follow before they get the link. The two buttons (Visit Profile + I&apos;m following) are added automatically.</p>
+                  <textarea
+                    value={gatedDmMessage}
+                    onChange={(e) => setGatedDmMessage(e.target.value.slice(0, 500))}
+                    className="w-full px-3 py-2.5 rounded-xl border border-input bg-background text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none h-24 transition-all text-sm leading-relaxed"
+                    placeholder="Almost there! Please visit my profile and tap follow to continue 😁"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">{gatedDmMessage.length}/500</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -205,6 +205,7 @@ async function processComment(job: Job<WebhookJobData>) {
         // Feature: gated vs direct DM flow
         dmStep: campaign.requireFollow ? 'gated' : 'direct',
         igAccountUsername: igAccount.igUsername,
+        gatedDmMessage: (campaign as any).gatedDmMessage || null,
         finalButtonLabel: firstDm.buttonLabel || 'Click me',
         finalButtonUrl: firstDm.buttonUrl || null,
       },
