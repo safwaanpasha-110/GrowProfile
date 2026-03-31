@@ -694,13 +694,7 @@ export function CampaignWizard({ igAccount, editingCampaign, singlePostMode = fa
                   >
                     {'{{name}}'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => insertVariable('{{username}}')}
-                    className="px-2.5 py-1 rounded-lg bg-secondary/10 text-secondary text-xs font-medium hover:bg-secondary/20 transition-colors"
-                  >
-                    {'{{username}}'}
-                  </button>
+
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
