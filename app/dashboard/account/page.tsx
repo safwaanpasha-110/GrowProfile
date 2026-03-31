@@ -41,14 +41,18 @@ export default function AccountPage() {
   const [connecting, setConnecting] = useState(false)
   const [disconnecting, setDisconnecting] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null)
 
   // Show toast from URL params (redirect from OAuth callback)
   useEffect(() => {
     const igConnected = searchParams.get('ig_connected')
+    const igAlreadyConnected = searchParams.get('ig_already_connected')
     const igError = searchParams.get('ig_error')
     if (igConnected) {
       setToast({ type: 'success', message: `Successfully connected @${igConnected}!` })
+      refreshProfile()
+    } else if (igAlreadyConnected) {
+      setToast({ type: 'warning', message: `@${igAlreadyConnected} is already connected to your account. Your access token has been refreshed.` })
       refreshProfile()
     } else if (igError) {
       setToast({ type: 'error', message: igError })
@@ -170,7 +174,9 @@ export default function AccountPage() {
         <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
           toast.type === 'success'
             ? 'bg-green-50 border border-green-200 text-green-800'
-            : 'bg-red-50 border border-red-200 text-red-800'
+            : toast.type === 'warning'
+              ? 'bg-amber-50 border border-amber-200 text-amber-800'
+              : 'bg-red-50 border border-red-200 text-red-800'
         }`}>
           {toast.type === 'success' ? (
             <CheckCircle2 className="w-5 h-5 flex-shrink-0" />

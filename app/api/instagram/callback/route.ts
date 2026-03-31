@@ -147,6 +147,21 @@ export async function GET(request: NextRequest) {
       (a) => a.igUserId === igUserId
     )
 
+    // ─── Block: IG account already connected to a DIFFERENT user ───
+    if (!alreadyConnected) {
+      const takenByOther = await prisma.instagramAccount.findFirst({
+        where: { igUserId, userId: { not: userId } },
+      })
+      if (takenByOther) {
+        const redirectUrl = new URL('/dashboard/account', FRONTEND_URL)
+        redirectUrl.searchParams.set(
+          'ig_error',
+          `@${igUsername} is already connected to another GrowProfile account. Disconnect it from that account first.`
+        )
+        return NextResponse.redirect(redirectUrl.toString())
+      }
+    }
+
     if (!alreadyConnected && existingCount >= maxAccounts) {
       const redirectUrl = new URL('/dashboard/account', FRONTEND_URL)
       redirectUrl.searchParams.set(
@@ -230,7 +245,12 @@ export async function GET(request: NextRequest) {
 
     // ─── Redirect to dashboard with success ───────────────
     const redirectUrl = new URL('/dashboard/account', FRONTEND_URL)
-    redirectUrl.searchParams.set('ig_connected', igUsername)
+    if (alreadyConnected) {
+      // Same user reconnecting — token refreshed
+      redirectUrl.searchParams.set('ig_already_connected', igUsername)
+    } else {
+      redirectUrl.searchParams.set('ig_connected', igUsername)
+    }
     return NextResponse.redirect(redirectUrl.toString())
   } catch (err: any) {
     console.error('Instagram callback error:', err)
