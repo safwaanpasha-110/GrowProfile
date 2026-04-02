@@ -99,7 +99,7 @@ export function LoginForm() {
         </div>
       </div>
 
-      {/* Password Field */
+      {/* Password Field */}
       <div>
         <label htmlFor="password" className="block text-sm font-medium text-slate-900 mb-2">
           Password
