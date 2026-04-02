@@ -11,6 +11,8 @@ import {
   Settings,
   BarChart3,
   MessageSquare,
+  Inbox,
+  Activity,
   HelpCircle,
   LogOut,
   ChevronDown
@@ -32,6 +34,14 @@ const menuItems = [
     alwaysExpanded: true,
     submenu: [
       { label: 'AutoDM', href: '/dashboard/apps/autodm' }
+    ]
+  },
+  {
+    label: 'Inbox',
+    icon: Inbox,
+    submenu: [
+      { label: 'Conversations', href: '/dashboard/inbox' },
+      { label: 'Activity Log', href: '/dashboard/inbox/activity' }
     ]
   },
   {
