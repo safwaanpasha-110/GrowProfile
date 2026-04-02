@@ -66,22 +66,6 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
               ))}
             </div>
           </div>
-          
-          {/* Testimonial */}
-          <div className="max-w-md">
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-              <p className="text-white/80 mb-4 italic">
-                "GrowProfile helped us convert 40% more comments into sales. The automated DMs feel natural and compliant."
-              </p>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary"></div>
-                <div>
-                  <p className="text-white font-medium">Sarah Johnson</p>
-                  <p className="text-white/60 text-sm">E-commerce Owner</p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       
