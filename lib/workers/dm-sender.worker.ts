@@ -441,20 +441,35 @@ const worker = new Worker<DmJobData>(
         return // Done for final step
       }
 
-      // ─── DIRECT FLOW: existing behavior (no follow-gate) ────────
+      // ─── DIRECT FLOW: no follow-gate ────────────────────────────
+
+      // Helper: send the DM — with button if URL is configured, plain text otherwise
+      const sendDirectDm = async (recipient: { id: string } | { comment_id: string }) => {
+        const hasBtnUrl = !!(finalButtonUrl && finalButtonUrl.trim())
+        if (hasBtnUrl) {
+          // Send interactive message with the configured button
+          return sendInteractiveMessage(
+            igUserId,
+            recipient,
+            messageText,
+            [{ type: 'web_url', title: finalButtonLabel || 'Open Link', url: finalButtonUrl! }],
+            igUserToken
+          )
+        }
+        // No button — send plain text
+        if ('comment_id' in recipient) {
+          return sendPrivateReply(igUserId, recipient.comment_id, messageText, igUserToken)
+        }
+        return sendInstagramDM(igUserId, recipient.id, messageText, igUserToken)
+      }
 
       // Send DM (private reply or direct DM)
       // Uses IG User Token at graph.instagram.com/{ig-user-id}/messages
       try {
         if (messageIndex === 0 && commentId) {
           try {
-            const result = await sendPrivateReply(
-              igUserId,
-              commentId,
-              messageText,
-              igUserToken
-            )
-            console.log(`[DmSender] Sent private reply`)
+            const result = await sendDirectDm({ comment_id: commentId })
+            console.log(`[DmSender] Sent private reply (direct flow, msg_id: ${result.message_id})`)
 
             await prisma.interaction.update({
               where: { id: interactionId },
@@ -474,13 +489,8 @@ const worker = new Worker<DmJobData>(
               )
             }
 
-            const result = await sendInstagramDM(
-              igUserId,
-              recipientId,
-              messageText,
-              igUserToken
-            )
-            console.log(`[DmSender] Sent direct DM (msg_id: ${result.message_id})`)
+            const result = await sendDirectDm({ id: recipientId })
+            console.log(`[DmSender] Sent direct DM fallback (msg_id: ${result.message_id})`)
 
             await prisma.interaction.update({
               where: { id: interactionId },
@@ -491,12 +501,7 @@ const worker = new Worker<DmJobData>(
             })
           }
         } else {
-          const result = await sendInstagramDM(
-            igUserId,
-            recipientId,
-            messageText,
-            igUserToken
-          )
+          const result = await sendDirectDm({ id: recipientId })
           console.log(`[DmSender] Sent DM ${messageIndex + 1}/${totalMessages} (msg_id: ${result.message_id})`)
 
           await prisma.interaction.update({
