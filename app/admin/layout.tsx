@@ -1,8 +1,11 @@
-'use client'
-
+import type { Metadata } from 'next'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import AdminSidebar from '@/components/AdminSidebar'
 import AdminHeader from '@/components/AdminHeader'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 export default function AdminLayout({
   children,

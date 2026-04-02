@@ -1,8 +1,11 @@
-'use client'
-
+import type { Metadata } from 'next'
 import { Sidebar } from '@/components/Sidebar'
 import { Header } from '@/components/Header'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 export default function DashboardLayout({
   children,
