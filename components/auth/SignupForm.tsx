@@ -6,7 +6,21 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
-import { Mail, Lock, ArrowRight, CheckCircle2, User, AlertCircle } from 'lucide-react'
+import { Mail, Lock, ArrowRight, CheckCircle2, User, AlertCircle, Eye, EyeOff } from 'lucide-react'
+
+function friendlyAuthError(message: string): string {
+  if (message.includes('auth/email-already-in-use'))
+    return 'An account with this email already exists. Try signing in.'
+  if (message.includes('auth/invalid-email'))
+    return 'Please enter a valid email address.'
+  if (message.includes('auth/weak-password'))
+    return 'Password is too weak. Use at least 8 characters with a mix of letters and numbers.'
+  if (message.includes('auth/too-many-requests'))
+    return 'Too many attempts. Please wait a few minutes and try again.'
+  if (message.includes('auth/network-request-failed'))
+    return 'Network error. Please check your internet connection.'
+  return 'Something went wrong. Please try again.'
+}
 
 export function SignupForm() {
   const [name, setName] = useState('')
@@ -16,6 +30,8 @@ export function SignupForm() {
   const [agreeToTerms, setAgreeToTerms] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const { signup, loginWithGoogle, user, isAdmin } = useAuth()
   const router = useRouter()
 
@@ -46,7 +62,7 @@ export function SignupForm() {
       await signup(email, password)
       // Navigation is handled by useEffect below after user state updates
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create account')
+      setError(friendlyAuthError(err instanceof Error ? err.message : ''))
     } finally {
       setIsLoading(false)
     }
@@ -136,14 +152,22 @@ export function SignupForm() {
           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
             id="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="pl-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 pr-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            tabIndex={-1}
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
         </div>
         <p className="text-xs text-slate-500 mt-2">At least 8 characters with numbers and special characters</p>
       </div>
@@ -157,14 +181,22 @@ export function SignupForm() {
           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
             id="confirmPassword"
-            type="password"
+            type={showConfirm ? 'text' : 'password'}
             placeholder="••••••••"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="pl-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 pr-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            tabIndex={-1}
+          >
+            {showConfirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
         </div>
       </div>
 

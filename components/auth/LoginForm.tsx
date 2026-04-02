@@ -6,13 +6,26 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/contexts/AuthContext'
-import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react'
+import { Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react'
+
+function friendlyAuthError(message: string): string {
+  if (message.includes('auth/invalid-credential') || message.includes('auth/wrong-password') || message.includes('auth/user-not-found'))
+    return 'Incorrect email or password. Please try again.'
+  if (message.includes('auth/too-many-requests'))
+    return 'Too many failed attempts. Please wait a few minutes and try again.'
+  if (message.includes('auth/invalid-email'))
+    return 'Please enter a valid email address.'
+  if (message.includes('auth/network-request-failed'))
+    return 'Network error. Please check your internet connection.'
+  return 'Something went wrong. Please try again.'
+}
 
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const { login, loginWithGoogle, user, isAdmin } = useAuth()
   const router = useRouter()
 
@@ -25,7 +38,7 @@ export function LoginForm() {
       await login(email, password)
       // Navigation is handled by useEffect below after user state updates
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during login')
+      setError(friendlyAuthError(err instanceof Error ? err.message : ''))
     } finally {
       setIsLoading(false)
     }
@@ -95,14 +108,22 @@ export function LoginForm() {
           <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <Input
             id="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="pl-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 pr-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            tabIndex={-1}
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
         </div>
       </div>
 

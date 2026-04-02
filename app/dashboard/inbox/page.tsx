@@ -7,7 +7,7 @@ import {
   MessageCircle, MessageSquare, Send, ArrowRight,
   Zap, CheckCircle2, Clock, AlertCircle, Loader2,
   RefreshCw, User, Instagram, ToggleLeft, ToggleRight,
-  ChevronRight, Bot, Hash
+  ChevronRight, Bot, Hash, Trash2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -274,10 +274,18 @@ export default function InboxPage() {
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-400 to-orange-400 flex items-center justify-center">
                   <span className="text-sm font-bold text-white">{activeUsername[0]?.toUpperCase()}</span>
                 </div>
-                <div>
+                <div className="flex-1">
                   <p className="font-semibold text-foreground">@{activeUsername}</p>
                   <p className="text-xs text-muted-foreground">{interactions.length} events in timeline</p>
                 </div>
+                <button
+                  type="button"
+                  title="Clear chat"
+                  onClick={() => { setActiveThread(null); setInteractions([]); setActiveUsername('') }}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
 
               {/* Timeline */}
