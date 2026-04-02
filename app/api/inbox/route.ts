@@ -113,3 +113,29 @@ export const GET = withAuth(async (request: NextRequest, user: AuthUser) => {
 
   return NextResponse.json({ success: true, interactions })
 })
+
+/**
+ * DELETE /api/inbox/events?igAccountId=...
+ * Clears all webhook events for the user's IG account(s).
+ */
+export const DELETE = withAuth(async (request: NextRequest, user: AuthUser) => {
+  const { searchParams } = request.nextUrl
+  const igAccountId = searchParams.get('igAccountId')
+
+  const igAccounts = await prisma.instagramAccount.findMany({
+    where: { userId: user.id, ...(igAccountId ? { id: igAccountId } : {}) },
+    select: { id: true },
+  })
+
+  if (igAccounts.length === 0) {
+    return NextResponse.json({ success: true, deleted: 0 })
+  }
+
+  const accountIds = igAccounts.map((a) => a.id)
+
+  const result = await prisma.webhookEvent.deleteMany({
+    where: { igAccountId: { in: accountIds } },
+  })
+
+  return NextResponse.json({ success: true, deleted: result.count })
+})
