@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   title: 'GrowProfile — Instagram Auto DM & Comment Automation',
   description:
     'Automate Instagram DMs and comment replies using the official Meta API. Turn every Instagram comment into a customer — 100% Meta-compliant.',
-  alternates: { canonical: 'https://growprofile.app' },
+  alternates: { canonical: 'https://growprofile.in' },
   openGraph: {
-    url: 'https://growprofile.app',
+    url: 'https://growprofile.in',
     title: 'GrowProfile — Instagram Auto DM & Comment Automation',
     description:
       'Automate Instagram DMs and comment replies using the official Meta API. Turn every Instagram comment into a customer.',

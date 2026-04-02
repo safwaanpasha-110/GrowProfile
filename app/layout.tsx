@@ -6,7 +6,7 @@ import './globals.css'
 const _geist = Geist({ subsets: ['latin'] })
 const _geistMono = Geist_Mono({ subsets: ['latin'] })
 
-const BASE_URL = 'https://growprofile.app'
+const BASE_URL = 'https://growprofile.in'
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),

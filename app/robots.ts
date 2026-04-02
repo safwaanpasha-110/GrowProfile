@@ -15,7 +15,7 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: 'https://growprofile.app/sitemap.xml',
-    host: 'https://growprofile.app',
+    sitemap: 'https://growprofile.in/sitemap.xml',
+    host: 'https://growprofile.in',
   }
 }

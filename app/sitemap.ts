@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const BASE_URL = 'https://growprofile.app'
+  const BASE_URL = 'https://growprofile.in'
   const now = new Date()
 
   return [

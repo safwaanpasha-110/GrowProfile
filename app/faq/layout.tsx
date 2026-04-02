@@ -4,9 +4,9 @@ export const metadata: Metadata = {
   title: 'FAQ — GrowProfile',
   description:
     'Answers to common questions about GrowProfile Instagram automation — how it works, Meta compliance, pricing, and setup.',
-  alternates: { canonical: 'https://growprofile.app/faq' },
+  alternates: { canonical: 'https://growprofile.in/faq' },
   openGraph: {
-    url: 'https://growprofile.app/faq',
+    url: 'https://growprofile.in/faq',
     title: 'FAQ — GrowProfile',
     description:
       'Answers to common questions about GrowProfile Instagram automation.',
