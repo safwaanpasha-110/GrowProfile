@@ -83,7 +83,14 @@ function parseWebhookEvent(event: WebhookEvent, myUsername?: string): EventRow {
         content = (p.text && p.text.trim()) ? p.text : '[Interactive DM with button]'
       } else {
         kind = 'dm_in'
-        username = p.from?.username || p.sender?.username || 'unknown'
+        // resolvedUsername is injected by the API (looked up from Interaction records)
+        // senderId is the raw IGSID — show truncated as last resort
+        const senderId: string = p.senderId || ''
+        username =
+          p.resolvedUsername ||
+          p.from?.username ||
+          p.sender?.username ||
+          (senderId ? `id:${senderId.slice(-6)}` : 'unknown')
         content = p.text || p.message?.text || ''
         if (!content.trim()) content = '[Voice / media message]'
       }

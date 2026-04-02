@@ -70,7 +70,7 @@ export const GET = withAuth(async (request: NextRequest, user: AuthUser) => {
     )
 
     // ─── Recent webhook events ──────────────────────────
-    const events = await prisma.webhookEvent.findMany({
+    const rawEvents = await prisma.webhookEvent.findMany({
       where: { igAccountId: { in: accountIds } },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -83,6 +83,45 @@ export const GET = withAuth(async (request: NextRequest, user: AuthUser) => {
         createdAt: true,
         igAccount: { select: { igUsername: true } },
       },
+    })
+
+    // Enrich non-echo message events with username from Interaction records.
+    // Meta's messaging webhook only gives us a senderId (IGSID), no username.
+    const senderIds = [
+      ...new Set(
+        rawEvents
+          .filter((e) => e.eventType === 'messages')
+          .map((e) => {
+            const p = e.payload as Record<string, any>
+            return !p?.isEcho && !p?.is_echo ? (p?.senderId as string | undefined) : undefined
+          })
+          .filter((id): id is string => !!id)
+      ),
+    ]
+
+    const usernameMap: Record<string, string> = {}
+    if (senderIds.length > 0) {
+      const matches = await prisma.interaction.findMany({
+        where: { igAccountId: { in: accountIds }, igScopedUserId: { in: senderIds } },
+        select: { igScopedUserId: true, igUsername: true },
+        distinct: ['igScopedUserId'],
+      })
+      for (const m of matches) {
+        if (m.igUsername) usernameMap[m.igScopedUserId] = m.igUsername
+      }
+    }
+
+    // Inject resolvedUsername into message event payloads
+    const events = rawEvents.map((e) => {
+      if (e.eventType !== 'messages') return e
+      const p = e.payload as Record<string, any>
+      if (p?.isEcho || p?.is_echo) return e
+      const senderId: string = p?.senderId || ''
+      const resolvedUsername = usernameMap[senderId] || null
+      return {
+        ...e,
+        payload: { ...p, resolvedUsername },
+      }
     })
 
     return NextResponse.json({ success: true, threads, events })
