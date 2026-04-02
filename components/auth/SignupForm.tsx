@@ -116,7 +116,7 @@ export function SignupForm() {
             placeholder="John Doe"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="pl-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 h-12 rounded-xl border-slate-400 bg-white focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />
@@ -136,7 +136,7 @@ export function SignupForm() {
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="pl-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 h-12 rounded-xl border-slate-400 bg-white focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />
@@ -156,7 +156,7 @@ export function SignupForm() {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="pl-12 pr-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 pr-12 h-12 rounded-xl border-slate-400 bg-white focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />
@@ -185,7 +185,7 @@ export function SignupForm() {
             placeholder="••••••••"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="pl-12 pr-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 pr-12 h-12 rounded-xl border-slate-400 bg-white focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />

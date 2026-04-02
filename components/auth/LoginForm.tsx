@@ -92,14 +92,14 @@ export function LoginForm() {
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="pl-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 h-12 rounded-xl border-slate-400 bg-white focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />
         </div>
       </div>
 
-      {/* Password Field */}
+      {/* Password Field */
       <div>
         <label htmlFor="password" className="block text-sm font-medium text-slate-900 mb-2">
           Password
@@ -112,7 +112,7 @@ export function LoginForm() {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="pl-12 pr-12 h-12 rounded-xl border-slate-200 focus:border-primary focus:ring-primary/20"
+            className="pl-12 pr-12 h-12 rounded-xl border-slate-400 bg-white focus:border-primary focus:ring-primary/20"
             required
             disabled={isLoading}
           />
